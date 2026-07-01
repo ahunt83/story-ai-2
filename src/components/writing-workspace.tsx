@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Brain, History, Layers, Loader2, Plus, RotateCcw, Save, WandSparkles, X } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { AiStatus, AppShell, SparkleAction } from "@/components/app-shell";
 import { ContinuityContextPanel } from "@/components/continuity-context";
@@ -43,6 +43,7 @@ type RevisionPreviewState = {
   generationId?: string;
   fallbackUsed?: boolean;
 };
+type PendingDraft = { sceneId: string; draftText: string; token: number };
 
 export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "draft" | "cowriter" }) {
   const router = useRouter();
@@ -60,6 +61,9 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<"navigator" | "ai" | "context" | "history" | null>(null);
   const [revisionPreview, setRevisionPreview] = useState<RevisionPreviewState | null>(null);
+  const pendingDraftRef = useRef<PendingDraft | null>(null);
+  const saveTokenRef = useRef(0);
+  const loadRequestRef = useRef(0);
 
   useEffect(() => {
     async function resolveAndLoad() {
@@ -90,12 +94,22 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   }, [chapterId, storyId, initialMode, router]);
 
   async function loadChapter(nextChapterId: string) {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     const data = await apiFetch<ChapterBundle>(`/api/chapters/${nextChapterId}`);
+    if (requestId !== loadRequestRef.current) {
+      return;
+    }
+
     setBundle(data);
     setActiveSceneId((current) => data.scenes.some((scene) => scene.id === current) ? current : data.scenes[0]?.id ?? null);
+    pendingDraftRef.current = null;
     setSaveStatus("saved");
     const story = await apiFetch<StoryResponse>(`/api/stories/${data.story.id}`);
+    if (requestId !== loadRequestRef.current) {
+      return;
+    }
+
     setStoryChapters(story.chapters);
     setLoading(false);
   }
@@ -111,29 +125,48 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
         ? "Collaborative Draft: Chapter 4"
         : "Chapter 4: The Shattered Mirror";
 
-  useEffect(() => {
-    if (!activeScene || !chapterId || saveStatus !== "unsaved") {
+  const flushPendingDraft = useCallback(async () => {
+    const pending = pendingDraftRef.current;
+    if (!pending) {
       return;
     }
 
-    const timeout = window.setTimeout(async () => {
-      setSaveStatus("saving");
-      try {
-        await apiFetch(`/api/scenes/${activeScene.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ draftText: activeScene.draftText })
-        });
+    setSaveStatus("saving");
+    try {
+      await apiFetch(`/api/scenes/${pending.sceneId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ draftText: pending.draftText })
+      });
+
+      if (pendingDraftRef.current?.token === pending.token) {
+        pendingDraftRef.current = null;
         setSaveStatus("saved");
-      } catch {
+      } else {
+        setSaveStatus("unsaved");
+      }
+    } catch (error) {
+      if (pendingDraftRef.current?.token === pending.token) {
         setSaveStatus("failed");
       }
+      throw error;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!activeScene || saveStatus !== "unsaved" || !pendingDraftRef.current) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      flushPendingDraft().catch(() => undefined);
     }, 950);
 
     return () => window.clearTimeout(timeout);
-  }, [activeScene, chapterId, saveStatus]);
+  }, [activeScene, flushPendingDraft, saveStatus]);
 
   function updateDraft(value: string) {
     if (!activeSceneId) return;
+    pendingDraftRef.current = { sceneId: activeSceneId, draftText: value, token: ++saveTokenRef.current };
     setActiveSceneDraft(value);
     setSaveStatus("unsaved");
   }
@@ -150,6 +183,16 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     if (!chapterId) return;
     await loadChapter(chapterId);
     if (message) setActionResult(message);
+  }
+
+  async function saveBeforeContinuing(action: () => void | Promise<void>) {
+    setError(null);
+    try {
+      await flushPendingDraft();
+      await action();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save latest draft");
+    }
   }
 
   async function generate(event: FormEvent<HTMLFormElement>) {
@@ -170,6 +213,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setRevisionPreview(null);
 
     try {
+      await flushPendingDraft();
       await streamAiText(`/api/chapters/${chapterId}/generate`, { direction, sceneId: activeSceneId }, (streamEvent) => {
         if (streamEvent.type === "delta") {
           streamedDraft += streamEvent.content;
@@ -208,6 +252,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setRevisionPreview({ originalText, draft: "", command, complete: false });
 
     try {
+      await flushPendingDraft();
       await streamAiText(`/api/chapters/${chapterId}/revise`, { command, sceneId: activeSceneId }, (streamEvent) => {
         if (streamEvent.type === "delta") {
           streamedDraft += streamEvent.content;
@@ -279,6 +324,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setError(null);
 
     try {
+      await flushPendingDraft();
       const result = await apiFetch<{ result: string }>(`/api/chapters/${chapterId}/${kind}`, {
         method: "POST",
         body: JSON.stringify({})
@@ -296,6 +342,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setBusy("chapter");
     setError(null);
     try {
+      await flushPendingDraft();
       const result = await apiFetch<{ chapterId: string }>(`/api/stories/${bundle.story.id}/chapters`, {
         method: "POST",
         body: JSON.stringify({})
@@ -314,6 +361,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setBusy("scene");
     setError(null);
     try {
+      await flushPendingDraft();
       const result = await apiFetch<{ scene: Scene }>(`/api/chapters/${chapterId}/scenes`, {
         method: "POST",
         body: JSON.stringify({})
@@ -332,10 +380,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setBusy("snapshot");
     setError(null);
     try {
-      await apiFetch(`/api/scenes/${activeScene.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ draftText: activeScene.draftText })
-      });
+      await flushPendingDraft();
       await apiFetch(`/api/chapters/${chapterId}/versions`, {
         method: "POST",
         body: JSON.stringify({ sceneId: activeScene.id, instruction: "Manual snapshot" })
@@ -353,6 +398,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     setBusy("restore");
     setError(null);
     try {
+      await flushPendingDraft();
       const result = await apiFetch<{ restoredSceneId: string }>(`/api/chapters/${chapterId}/versions/${versionId}/restore`, {
         method: "POST",
         body: JSON.stringify({})
@@ -367,7 +413,18 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   }
 
   const action = chapterId
-    ? <Link href={`/writing/extraction?chapterId=${chapterId}`} className="hidden rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105 sm:inline-flex">Extract Memory</Link>
+    ? (
+      <Link
+        href={`/writing/extraction?chapterId=${chapterId}`}
+        onClick={(event) => {
+          event.preventDefault();
+          saveBeforeContinuing(() => router.push(`/writing/extraction?chapterId=${chapterId}`));
+        }}
+        className="hidden rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105 sm:inline-flex"
+      >
+        Extract Memory
+      </Link>
+    )
     : <Link href="/" className="hidden rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105 sm:inline-flex">Create Story</Link>;
   const draftLocked = busy === "generate" || busy === "revise" || busy === "apply-revision" || Boolean(revisionPreview);
   const hasLiveChapter = Boolean(bundle && chapterId);
@@ -397,14 +454,18 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
             scenes={sortedScenes}
             currentChapterId={chapterId}
             activeSceneId={activeSceneId}
-            onChapter={(id) => {
-              setRevisionPreview(null);
-              setChapterId(id);
-              router.push(`/writing?chapterId=${id}`);
+              onChapter={(id) => {
+              saveBeforeContinuing(() => {
+                setRevisionPreview(null);
+                setChapterId(id);
+                router.push(`/writing?chapterId=${id}`);
+              });
             }}
             onScene={(id) => {
-              setRevisionPreview(null);
-              setActiveSceneId(id);
+              saveBeforeContinuing(() => {
+                setRevisionPreview(null);
+                setActiveSceneId(id);
+              });
             }}
             onNewChapter={createNextChapter}
             onNewScene={createScene}
@@ -425,6 +486,9 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
               text={revisionPreview ? revisionPreview.draft : displayedText}
               editable={Boolean(bundle && activeScene) && !draftLocked}
               onChange={updateDraft}
+              onBlur={() => {
+                flushPendingDraft().catch(() => undefined);
+              }}
               saveStatus={busy === "generate" ? "saving" : saveStatus}
               revisionPreview={revisionPreview ? {
                 streaming: !revisionPreview.complete || busy === "revise",
@@ -469,15 +533,19 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
           currentChapterId={chapterId}
           activeSceneId={activeSceneId}
           onChapter={(id) => {
-            setRevisionPreview(null);
-            setChapterId(id);
-            setMobileSheet(null);
-            router.push(`/writing?chapterId=${id}`);
+            saveBeforeContinuing(() => {
+              setRevisionPreview(null);
+              setChapterId(id);
+              setMobileSheet(null);
+              router.push(`/writing?chapterId=${id}`);
+            });
           }}
           onScene={(id) => {
-            setRevisionPreview(null);
-            setActiveSceneId(id);
-            setMobileSheet(null);
+            saveBeforeContinuing(() => {
+              setRevisionPreview(null);
+              setActiveSceneId(id);
+              setMobileSheet(null);
+            });
           }}
           onNewChapter={createNextChapter}
           onNewScene={createScene}
@@ -492,7 +560,14 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
         </div>
         <LiveControls busy={busy} generate={generate} revise={revise} coWriter={initialMode === "cowriter"} />
         {chapterId ? (
-          <Link href={`/writing/extraction?chapterId=${chapterId}`} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-intelligence-teal px-4 py-3 text-sm font-bold text-on-primary transition hover:brightness-105">
+          <Link
+            href={`/writing/extraction?chapterId=${chapterId}`}
+            onClick={(event) => {
+              event.preventDefault();
+              saveBeforeContinuing(() => router.push(`/writing/extraction?chapterId=${chapterId}`));
+            }}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-intelligence-teal px-4 py-3 text-sm font-bold text-on-primary transition hover:brightness-105"
+          >
             <BookOpen size={16} />
             Extract Memory
           </Link>

@@ -34,7 +34,8 @@ test.describe("designed screen smoke tests", () => {
   test("memory approval screen renders extracted sections", async ({ page }) => {
     await page.goto("/writing/extraction");
     await expect(page.getByText("Continuity Extraction")).toBeVisible();
-    await expect(page.getByText("Chapter Summaries")).toBeVisible();
+    await expect(page.getByText("No Memory Extracted")).toBeVisible();
+    await expect(page.getByText("Run extraction to create reviewable continuity memory")).toBeVisible();
     await expect(page.getByText("Commit to Story Bible").first()).toBeVisible();
   });
 

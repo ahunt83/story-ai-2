@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { chapters, storyFoundations } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
-import { requireOwnedStory } from "@/lib/ownership";
+import { NotFoundError, requireOwnedStory } from "@/lib/ownership";
 import { storyFoundationSchema } from "@/lib/story-foundation/schema";
 
 export async function POST(_request: Request, context: { params: Promise<{ storyId: string }> }) {
@@ -19,7 +19,7 @@ export async function POST(_request: Request, context: { params: Promise<{ story
       .limit(1);
 
     if (!foundationRecord) {
-      throw new Error("Story Foundation not found");
+      throw new NotFoundError("Story Foundation not found");
     }
 
     const parsed = storyFoundationSchema.parse(foundationRecord.foundation);

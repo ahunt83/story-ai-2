@@ -7,8 +7,10 @@ import { startAiRun } from "@/lib/ai-runs";
 import { ok, fail } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { createId } from "@/lib/ids";
-import { storyFoundationSuggestsNsfw, textSuggestsNsfw } from "@/lib/nsfw";
+import { textSuggestsNsfw } from "@/lib/nsfw";
+import { canClaimUnownedStories } from "@/lib/ownership";
 import { createStoryFoundation } from "@/lib/story-foundation/ai";
+import { applyFoundationNsfwPolicy } from "@/lib/story-foundation/nsfw";
 import { defaultStoryModelSettings } from "@/lib/story-settings";
 import { emptyBible } from "@/lib/story-memory/mock";
 import { ensureUserPreferences, updateUserPreferences } from "@/lib/user-preferences";
@@ -24,10 +26,11 @@ export async function GET() {
   try {
     const user = await requireUser();
     const preferences = await ensureUserPreferences(user.id);
+    const allowUnownedClaim = await canClaimUnownedStories();
     const storyFilters = [
       eq(stories.status, "active"),
       preferences.nsfwMode ? undefined : eq(stories.isNsfw, false),
-      or(eq(stories.ownerUserId, user.id), isNull(stories.ownerUserId))
+      allowUnownedClaim ? or(eq(stories.ownerUserId, user.id), isNull(stories.ownerUserId)) : eq(stories.ownerUserId, user.id)
     ].filter(Boolean);
     const rows = await db
       .select()
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
     const foundationId = createId("foundation");
     const preferences = await ensureUserPreferences(user.id);
     const initialNsfw = Boolean(input.isNsfw || preferences.nsfwMode || textSuggestsNsfw(input.initialPrompt, input.genreToneNotes));
-    let modelSettings = defaultStoryModelSettings({ nsfw: initialNsfw });
+    const modelSettings = defaultStoryModelSettings({ nsfw: initialNsfw });
 
     await db.transaction(async (tx) => {
       await tx.insert(stories).values({
@@ -97,30 +100,26 @@ export async function POST(request: Request) {
       operation: "story_foundation",
       model: modelSettings.extractionModel
     });
-    const foundationRun = await createStoryFoundation({
-      title: input.title,
-      initialPrompt: input.initialPrompt,
-      genreToneNotes: input.genreToneNotes,
-      modelSettings
-    });
+    let foundationRun: Awaited<ReturnType<typeof createStoryFoundation>>;
+    try {
+      foundationRun = await createStoryFoundation({
+        title: input.title,
+        initialPrompt: input.initialPrompt,
+        genreToneNotes: input.genreToneNotes,
+        modelSettings
+      });
+    } catch (error) {
+      await aiRun.fail(error);
+      throw error;
+    }
     const foundation = {
       ...foundationRun.parsed,
       metadata: { ...foundationRun.parsed.metadata, status: "draft" as const }
     };
-    const finalNsfw = initialNsfw || storyFoundationSuggestsNsfw(foundation);
+    const foundationNsfw = await applyFoundationNsfwPolicy({ storyId, userId: user.id, foundation });
+    const finalNsfw = initialNsfw || foundationNsfw;
 
-    if (finalNsfw && !initialNsfw) {
-      modelSettings = defaultStoryModelSettings({ nsfw: true });
-      await db.transaction(async (tx) => {
-        await tx.update(stories).set({ isNsfw: true, updatedAt: new Date() }).where(eq(stories.id, storyId));
-        await tx
-          .update(storyModelSettings)
-          .set({ ...modelSettings, updatedAt: new Date() })
-          .where(eq(storyModelSettings.storyId, storyId));
-      });
-    }
-
-    if (finalNsfw && !preferences.nsfwMode) {
+    if (initialNsfw && !preferences.nsfwMode) {
       await updateUserPreferences(user.id, { nsfwMode: true });
     }
 

@@ -40,6 +40,7 @@ export function FoundationWorkspace() {
   const [message, setMessage] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<FoundationStep>("identity");
   const [showJson, setShowJson] = useState(false);
+  const [jsonParseError, setJsonParseError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!storyId && !chapterId) {
@@ -71,6 +72,7 @@ export function FoundationWorkspace() {
     const response = await apiFetch<FoundationResponse>(`/api/stories/${id}/foundation`);
     setData(response);
     setJsonText(response.foundation ? JSON.stringify(response.foundation, null, 2) : "");
+    setJsonParseError(null);
     setLoading(false);
   }
 
@@ -88,6 +90,7 @@ export function FoundationWorkspace() {
       });
       setData((current) => current ? { ...current, foundation: response.foundation, status: response.status } : current);
       setJsonText(JSON.stringify(response.foundation, null, 2));
+      setJsonParseError(null);
       setMessage("Foundation saved as draft.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save foundation");
@@ -109,6 +112,7 @@ export function FoundationWorkspace() {
       });
       setData((current) => current ? { ...current, foundation: response.foundation, status: response.status } : current);
       setJsonText(JSON.stringify(response.foundation, null, 2));
+      setJsonParseError(null);
       setMessage("Foundation regenerated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not regenerate foundation");
@@ -150,6 +154,11 @@ export function FoundationWorkspace() {
 
   function updateFoundation(mutator: (foundation: StoryFoundation) => void) {
     if (!foundation) return;
+    if (jsonParseError) {
+      setError("Fix the Advanced JSON before editing structured fields.");
+      return;
+    }
+
     const next = JSON.parse(JSON.stringify(foundation)) as StoryFoundation;
     mutator(next);
     setJsonText(JSON.stringify(next, null, 2));
@@ -195,8 +204,8 @@ export function FoundationWorkspace() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={regenerateFoundation} disabled={Boolean(busy)}><RefreshCw size={16} />Regenerate</Button>
-                <Button variant="secondary" onClick={saveFoundation} disabled={Boolean(busy)}><Save size={16} />Save Draft</Button>
-                <Button variant="teal" onClick={approveFoundation} disabled={Boolean(busy)}><CheckCircle2 size={16} />Approve and Start Writing</Button>
+                <Button variant="secondary" onClick={saveFoundation} disabled={Boolean(busy) || Boolean(jsonParseError)}><Save size={16} />Save Draft</Button>
+                <Button variant="teal" onClick={approveFoundation} disabled={Boolean(busy) || Boolean(jsonParseError)}><CheckCircle2 size={16} />Approve and Start Writing</Button>
               </div>
             </section>
 
@@ -237,7 +246,7 @@ export function FoundationWorkspace() {
                       {nextStep ? (
                         <Button variant="teal" onClick={() => setActiveStep(nextStep)}>Next: {foundationSteps[currentStepIndex + 1]?.label}<ArrowRight size={16} /></Button>
                       ) : (
-                        <Button variant="teal" onClick={approveFoundation} disabled={Boolean(busy)}><CheckCircle2 size={16} />Approve and Start Writing</Button>
+                        <Button variant="teal" onClick={approveFoundation} disabled={Boolean(busy) || Boolean(jsonParseError)}><CheckCircle2 size={16} />Approve and Start Writing</Button>
                       )}
                     </div>
                   </div>
@@ -247,10 +256,20 @@ export function FoundationWorkspace() {
                       <SectionHeading icon={<FileJson size={16} />} title="Advanced Structured Plan" />
                       <textarea
                         value={jsonText}
-                        onChange={(event) => setJsonText(event.target.value)}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setJsonText(value);
+                          try {
+                            if (value.trim()) JSON.parse(value);
+                            setJsonParseError(null);
+                          } catch {
+                            setJsonParseError("Advanced JSON is invalid. Structured fields and saving are paused until it parses.");
+                          }
+                        }}
                         spellCheck={false}
                         className="foundation-json-editor min-h-[520px] w-full rounded-md border border-outline-variant bg-surface-container-lowest p-4 font-mono text-xs leading-5 text-on-surface outline-none focus:border-intelligence-teal"
                       />
+                      {jsonParseError ? <p className="mt-2 text-sm font-bold text-red-700">{jsonParseError}</p> : null}
                     </section>
                   ) : null}
                 </section>

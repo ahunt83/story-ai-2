@@ -114,6 +114,10 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+}
+
 ::selection {
   background: var(--intelligence-glow);
 }

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { characterCandidates, chapterMemories, chapters, scenes } from "@/db/schema";
 import { startAiRun } from "@/lib/ai-runs";
-import { fail, ok } from "@/lib/api";
+import { BadRequestError, fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createId } from "@/lib/ids";
@@ -21,7 +21,7 @@ export async function POST(_request: Request, context: { params: Promise<{ chapt
     const chapterText = bundle.chapter.approvedText ?? chapterTextFromScenes(bundle.scenes);
 
     if (!chapterText.trim()) {
-      throw new Error("Cannot extract memory from an empty chapter");
+      throw new BadRequestError("Cannot extract memory from an empty chapter");
     }
 
     const modelSettings = await resolveStoryModelSettings(bundle.story.id);

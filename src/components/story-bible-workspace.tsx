@@ -116,33 +116,36 @@ export function StoryBibleWorkspace() {
   const [characterBusy, setCharacterBusy] = useState<string | null>(null);
   const [characterNotice, setCharacterNotice] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement | null>(null);
+  const storyRequestRef = useRef(0);
+  const bibleRequestRef = useRef(0);
 
   const tab = tabs.find((item) => item.label === activeTab) ?? tabs[0];
   const category = tab.categories.length === 1 ? tab.categories[0] : "";
 
   useEffect(() => {
     async function resolveStory() {
+      const requestId = ++storyRequestRef.current;
       setLoading(true);
       setError(null);
       try {
         if (requestedStoryId) {
           const response = await apiFetch<{ story: StorySummary }>(`/api/stories/${requestedStoryId}`);
-          setStory(response.story);
+          if (requestId === storyRequestRef.current) setStory(response.story);
           return;
         }
 
         if (requestedChapterId) {
           const response = await apiFetch<{ story: StorySummary }>(`/api/chapters/${requestedChapterId}`);
-          setStory(response.story);
+          if (requestId === storyRequestRef.current) setStory(response.story);
           return;
         }
 
         const response = await apiFetch<{ stories: StorySummary[] }>("/api/stories");
-        setStory(response.stories[0] ?? null);
+        if (requestId === storyRequestRef.current) setStory(response.stories[0] ?? null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load story");
+        if (requestId === storyRequestRef.current) setError(err instanceof Error ? err.message : "Could not load story");
       } finally {
-        setLoading(false);
+        if (requestId === storyRequestRef.current) setLoading(false);
       }
     }
 
@@ -155,6 +158,7 @@ export function StoryBibleWorkspace() {
       return;
     }
 
+    const requestId = ++bibleRequestRef.current;
     const timeout = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
@@ -165,11 +169,11 @@ export function StoryBibleWorkspace() {
         if (query.trim()) params.set("q", query.trim());
         const suffix = params.toString() ? `?${params}` : "";
         const response = await apiFetch<BibleResponse>(`/api/stories/${story.id}/bible${suffix}`);
-        setData(response);
+        if (requestId === bibleRequestRef.current) setData(response);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load Story Bible");
+        if (requestId === bibleRequestRef.current) setError(err instanceof Error ? err.message : "Could not load Story Bible");
       } finally {
-        setLoading(false);
+        if (requestId === bibleRequestRef.current) setLoading(false);
       }
     }, query ? 250 : 0);
 

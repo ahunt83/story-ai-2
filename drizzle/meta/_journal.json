@@ -43,6 +43,13 @@
       "when": 1782940300000,
       "tag": "0005_character_system",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782940400000,
+      "tag": "0006_unique_story_ordering",
+      "breakpoints": true
     }
   ]
 }

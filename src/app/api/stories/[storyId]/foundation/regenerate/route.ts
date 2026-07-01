@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { createId } from "@/lib/ids";
 import { requireOwnedStory } from "@/lib/ownership";
 import { createStoryFoundation } from "@/lib/story-foundation/ai";
+import { applyFoundationNsfwPolicy } from "@/lib/story-foundation/nsfw";
 import { resolveStoryModelSettings } from "@/lib/story-settings";
 
 export async function POST(_request: Request, context: { params: Promise<{ storyId: string }> }) {
@@ -22,16 +23,23 @@ export async function POST(_request: Request, context: { params: Promise<{ story
       operation: "story_foundation",
       model: modelSettings.extractionModel
     });
-    const foundationRun = await createStoryFoundation({
-      title: story.title,
-      initialPrompt: story.initialPrompt,
-      genreToneNotes: story.genreToneNotes,
-      modelSettings
-    });
+    let foundationRun: Awaited<ReturnType<typeof createStoryFoundation>>;
+    try {
+      foundationRun = await createStoryFoundation({
+        title: story.title,
+        initialPrompt: story.initialPrompt,
+        genreToneNotes: story.genreToneNotes,
+        modelSettings
+      });
+    } catch (error) {
+      await aiRun.fail(error);
+      throw error;
+    }
     const foundation = {
       ...foundationRun.parsed,
       metadata: { ...foundationRun.parsed.metadata, status: "draft" as const }
     };
+    const isNsfw = await applyFoundationNsfwPolicy({ storyId, userId: user.id, foundation });
 
     await db
       .insert(storyFoundations)
@@ -59,7 +67,7 @@ export async function POST(_request: Request, context: { params: Promise<{ story
       validationStatus: "valid"
     });
 
-    return ok({ foundation, status: "draft" });
+    return ok({ foundation, status: "draft", isNsfw });
   } catch (error) {
     return fail(error);
   }

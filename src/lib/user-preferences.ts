@@ -17,9 +17,19 @@ export async function ensureUserPreferences(userId: string) {
       themePreference: defaultThemePreference,
       nsfwMode: false
     })
+    .onConflictDoNothing()
     .returning();
 
-  return created;
+  if (created) {
+    return created;
+  }
+
+  const [preference] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
+  if (!preference) {
+    throw new Error("Could not load user preferences.");
+  }
+
+  return preference;
 }
 
 export async function updateUserPreferences(userId: string, input: {

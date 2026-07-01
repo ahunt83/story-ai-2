@@ -6,6 +6,7 @@ import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { createId } from "@/lib/ids";
 import { requireOwnedStory } from "@/lib/ownership";
+import { applyFoundationNsfwPolicy } from "@/lib/story-foundation/nsfw";
 import { storyFoundationSchema } from "@/lib/story-foundation/schema";
 
 export async function GET(_request: Request, context: { params: Promise<{ storyId: string }> }) {
@@ -49,6 +50,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ story
       ...parsed,
       metadata: { ...parsed.metadata, status: "draft" as const }
     };
+    const isNsfw = await applyFoundationNsfwPolicy({ storyId, userId: user.id, foundation });
     const [existing] = await db
       .select()
       .from(storyFoundations)
@@ -70,7 +72,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ story
       });
     }
 
-    return ok({ foundation, status: "draft" });
+    return ok({ foundation, status: "draft", isNsfw });
   } catch (error) {
     return fail(error);
   }

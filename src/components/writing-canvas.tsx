@@ -10,14 +10,17 @@ export function WritingCanvas({
   text,
   editable = false,
   onChange,
+  onBlur,
   saveStatus,
-  revisionPreview
+  revisionPreview,
+  showSampleFallback = false
 }: {
   mode?: "draft" | "cowriter" | "readonly";
   title?: string;
   text?: string;
   editable?: boolean;
   onChange?: (value: string) => void;
+  onBlur?: () => void;
   saveStatus?: "saved" | "saving" | "unsaved" | "failed";
   revisionPreview?: {
     streaming: boolean;
@@ -25,8 +28,9 @@ export function WritingCanvas({
     onAccept: () => void;
     onReject: () => void;
   };
+  showSampleFallback?: boolean;
 }) {
-  const displayText = revisionPreview ? (text ?? "") : text?.trim() ? text : sampleChapterText;
+  const displayText = revisionPreview ? (text ?? "") : text?.trim() || !showSampleFallback ? (text ?? "") : sampleChapterText;
   const displayTitle = title ?? (mode === "cowriter" ? "Collaborative Draft: Chapter 4" : "Chapter 4: The Shattered Mirror");
   const wordCount = displayText.trim().split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(wordCount / 260));
@@ -45,7 +49,7 @@ export function WritingCanvas({
         {revisionPreview ? (
           <RevisionPreviewProse text={displayText} streaming={revisionPreview.streaming} />
         ) : editable ? (
-          <EditableProse text={displayText} onChange={onChange} saveStatus={saveStatus} />
+          <EditableProse text={displayText} onChange={onChange} onBlur={onBlur} saveStatus={saveStatus} />
         ) : mode === "cowriter" && !text ? <CoWriterProse /> : <Prose text={displayText} />}
         {mode === "cowriter" && revisionPreview ? (
           <div className="sticky bottom-6 mt-16 flex justify-center gap-3">
@@ -65,10 +69,12 @@ export function WritingCanvas({
 function EditableProse({
   text,
   onChange,
+  onBlur,
   saveStatus = "saved"
 }: {
   text: string;
   onChange?: (value: string) => void;
+  onBlur?: () => void;
   saveStatus?: "saved" | "saving" | "unsaved" | "failed";
 }) {
   const statusLabel = {
@@ -89,6 +95,7 @@ function EditableProse({
       <textarea
         value={text}
         onChange={(event) => onChange?.(event.target.value)}
+        onBlur={onBlur}
         className="story-prose min-h-[58vh] w-full resize-y rounded-md border border-transparent bg-transparent p-0 text-on-surface outline-none transition focus:border-memory-border focus:bg-white/40 focus:p-4"
         spellCheck
         aria-label="Scene draft text"

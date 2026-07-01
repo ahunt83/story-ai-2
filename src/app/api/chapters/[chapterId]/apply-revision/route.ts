@@ -7,6 +7,7 @@ import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createId } from "@/lib/ids";
+import { NotFoundError } from "@/lib/ownership";
 import { loadChapterBundle } from "../helpers";
 
 const applyRevisionSchema = z.object({
@@ -31,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
     const targetScene = bundle.scenes.find((scene) => scene.id === input.sceneId);
 
     if (!targetScene) {
-      throw new Error("Scene not found");
+      throw new NotFoundError("Scene not found");
     }
 
     await db.transaction(async (tx) => {
