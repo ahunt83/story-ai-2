@@ -17,5 +17,24 @@ services:
       timeout: 5s
       retries: 10
 
+  test-db:
+    image: pgvector/pgvector:pg17
+    container_name: story-ai-test-postgres
+    environment:
+      POSTGRES_USER: story_ai
+      POSTGRES_PASSWORD: story_ai
+      POSTGRES_DB: story_ai_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - story-ai-test-postgres:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U story_ai -d story_ai_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   story-ai-postgres:
+  story-ai-test-postgres:

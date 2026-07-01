@@ -18,6 +18,7 @@ Expected environment variables:
 
 ```bash
 DATABASE_URL=postgres://story_ai:story_ai@localhost:5432/story_ai
+TEST_DATABASE_URL=postgres://story_ai:story_ai@localhost:5433/story_ai_test
 OPENROUTER_API_KEY=
 OPENROUTER_CHAT_MODEL=anthropic/claude-sonnet-4.5
 OPENROUTER_EXTRACT_MODEL=openai/gpt-4o
@@ -35,6 +36,7 @@ Without `OPENROUTER_API_KEY`, AI routes intentionally use deterministic fallback
 - `src/lib/story-memory`: memory schemas, prompts, AI helpers, normalization, context builder.
 - `src/lib/openrouter.ts`: OpenRouter client and deterministic embedding fallback.
 - `src/e2e`: Playwright smoke tests.
+- `src/e2e/global-setup.ts`: guarded Playwright test database reset and migration setup when `TEST_DATABASE_URL` is set.
 - `db/init`: Postgres init scripts, including pgvector extension setup.
 - `docs`: project handoff and system documentation.
 
@@ -94,6 +96,7 @@ Live route conventions:
 
 - Prefer `?chapterId=:chapterId` for writing and extraction screens.
 - Prefer `?storyId=:storyId` for Story Bible. If omitted, the page loads the most recently updated active story.
+- `/bible?chapterId=:chapterId` is also supported so shared navigation can preserve live context from a writing URL.
 
 ## Key Components
 
@@ -114,6 +117,15 @@ npm run test
 npm run build
 npm run test:e2e
 ```
+
+Run the mutating happy-path Playwright workflow against the isolated test database:
+
+```bash
+docker-compose up -d test-db
+npm run test:e2e:isolated
+```
+
+When `TEST_DATABASE_URL` is present, Playwright starts Next on `127.0.0.1:3001` with `DATABASE_URL=$TEST_DATABASE_URL`, `NEXT_DIST_DIR=.next-test`, and an empty `OPENROUTER_API_KEY`. It resets the test database and applies the generated migration before tests run. The reset guard refuses non-local URLs or database names that do not include `test`.
 
 Database verification:
 

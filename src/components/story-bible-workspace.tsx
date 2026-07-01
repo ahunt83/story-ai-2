@@ -51,6 +51,7 @@ const tabs = [
 export function StoryBibleWorkspace() {
   const searchParams = useSearchParams();
   const requestedStoryId = searchParams.get("storyId");
+  const requestedChapterId = searchParams.get("chapterId");
   const [story, setStory] = useState<StorySummary | null>(null);
   const [data, setData] = useState<BibleResponse | null>(null);
   const [activeTab, setActiveTab] = useState("Canon Facts");
@@ -73,6 +74,12 @@ export function StoryBibleWorkspace() {
           return;
         }
 
+        if (requestedChapterId) {
+          const response = await apiFetch<{ story: StorySummary }>(`/api/chapters/${requestedChapterId}`);
+          setStory(response.story);
+          return;
+        }
+
         const response = await apiFetch<{ stories: StorySummary[] }>("/api/stories");
         setStory(response.stories[0] ?? null);
       } catch (err) {
@@ -83,7 +90,7 @@ export function StoryBibleWorkspace() {
     }
 
     resolveStory();
-  }, [requestedStoryId]);
+  }, [requestedChapterId, requestedStoryId]);
 
   useEffect(() => {
     if (!story?.id) {

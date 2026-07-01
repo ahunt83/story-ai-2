@@ -37,6 +37,17 @@ A local single-user AI story writing app with chapter drafting, co-writer revisi
 
 Open http://localhost:3000.
 
+## Isolated E2E Tests
+
+The mutating Playwright workflow uses a separate test database so local story data is not touched:
+
+```bash
+docker-compose up -d test-db
+npm run test:e2e:isolated
+```
+
+`test:e2e:isolated` sets `TEST_DATABASE_URL=postgres://story_ai:story_ai@localhost:5433/story_ai_test`. Playwright runs Next on `127.0.0.1:3001` with `.next-test`, resets the test database, applies the generated migration, clears `OPENROUTER_API_KEY`, and uses deterministic local AI fallbacks.
+
 ## Notes
 
 - The app uses OpenRouter for drafting, revision, structured memory extraction, story bible merging, and embeddings.

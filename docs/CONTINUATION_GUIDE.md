@@ -35,7 +35,9 @@ Built and verified:
 - Story Bible screen reads live `story_bibles` and normalized `memory_items` with tabs/search/filtering.
 - Context preview panel reads the same context endpoint used by generation and Memory Check.
 - Generated Drizzle migration files and `db:migrate`/`db:seed` scripts.
-- Unit tests and Playwright smoke tests.
+- Unit tests, Playwright smoke tests, and a guarded full Playwright workflow test for create, generate, revise, extract, commit, and Story Bible verification.
+- Isolated Playwright test database support via the `test-db` Docker Compose service and `TEST_DATABASE_URL`.
+- Shared sidebar navigation preserves live `chapterId`/`storyId` context; Story Bible can resolve `/bible?chapterId=...`.
 
 Last known verification:
 
@@ -69,6 +71,15 @@ colima start
 docker-compose up -d
 ```
 
+Mutating E2E workflow tests should use the isolated test database:
+
+```bash
+docker-compose up -d test-db
+npm run test:e2e:isolated
+```
+
+The Playwright global setup resets only a local database whose name includes `test`, applies the generated migration, and clears `OPENROUTER_API_KEY` for deterministic no-network AI fallbacks. Isolated runs use `127.0.0.1:3001` and `.next-test` so they can run beside a normal dev server on port 3000.
+
 ## Documentation Rule
 
 Future Codex sessions should update documentation whenever a significant build changes project behavior or implementation details.
@@ -96,10 +107,12 @@ Use this rule before final handoff: if a future session would need to know it, w
 
 ## Recommended Next Work
 
-The strongest next slice is production hardening:
+The strongest non-production next slice is responsive and UX polish:
 
-1. Add streaming generation/revision responses.
-2. Add full Playwright workflow coverage for create, edit, autosave reload, version restore, extract, approve, commit, and Story Bible verification.
-3. Exercise migrations against a clean database in CI/deployment setup.
+1. Replace stacked mobile side panels with real drawers/sheets for chapter navigation, context, and AI controls.
+2. Broaden loading/empty/error states across Library, Writing, Extraction, and Story Bible.
+3. Add optional API-level integration tests for direct database assertions around extract/commit.
+
+Production hardening remains tracked separately in `TODO.md`, including streaming generation/revision and deployment/auth/cost-control work.
 
 See `TODO.md` for detailed implementation steps and acceptance criteria.

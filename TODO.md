@@ -4,9 +4,10 @@ This file tracks the remaining work after the initial MVP scaffold and live work
 
 Status after the current build pass:
 
-- Completed: items 1, 2, 3, 4, 5, 6, and 8.
+- Completed: items 1, 2, 3, 4, 5, 6, 8, and 9.
 - Partially completed: item 7. OpenRouter errors, usage metadata, failed-call metadata, model display, and extraction structured-output guidance are implemented; true streaming generation/revision remains.
-- Still open: item 9 workflow tests, item 10 UX/responsive refinement, and item 11 later production work.
+- Partially completed: item 10. Sidebar navigation preserves live `chapterId`/`storyId` context, and Story Bible can resolve a story from `chapterId`; mobile drawers/sheets and broader polish remain.
+- Still open: item 10 UX/responsive refinement and item 11 later production work.
 
 Recommended build order:
 
@@ -14,7 +15,7 @@ Recommended build order:
 - [x] Add a real manuscript editor with autosave and version rollback.
 - [x] Add chapter/scene navigation and next-chapter workflow.
 - [ ] Finish OpenRouter production behavior by adding true streaming generation/revision.
-- [ ] Expand workflow tests with an isolated test database and full happy-path coverage.
+- [x] Expand workflow tests with an isolated test database and full happy-path coverage.
 - [x] Prepare database migrations and setup hygiene.
 
 Documentation rule for future builds:
@@ -262,50 +263,47 @@ Implementation details:
   - [x] Fresh clone can create DB from migrations.
   - [x] Recommitting edited memory does not duplicate visible facts.
 
-## 9. Workflow Tests — Open
+## 9. Workflow Tests — Completed
 
-Status: Open. Existing Playwright smoke tests pass, but full happy-path workflow coverage with an isolated test database is still needed.
+Status: Completed for the local MVP. Existing Playwright smoke tests remain, and `src/e2e/live-workflow.spec.ts` covers create story, generate, revise, extract, commit, and Story Bible verification against an isolated test database when `TEST_DATABASE_URL` is set.
 
 Goal: Test the live product workflow, not only screen smoke.
 
 Implementation details:
 
 - Add isolated test database setup:
-  - Smoke/integration tests must not run against the user's active local working database.
-  - Preferred option: add a separate Docker Compose service for tests, for example Postgres on host port `5433` with database/user/password such as `story_ai_test`.
-  - Acceptable option: use a separate database on the same local Postgres server, for example `story_ai_test`, with a distinct `TEST_DATABASE_URL`.
-  - The test runner should set `DATABASE_URL=$TEST_DATABASE_URL` or load a dedicated `.env.test`.
-  - Test setup should apply schema to the test database before tests run.
-  - Test teardown should truncate/drop test data without touching the development database.
-  - Playwright smoke tests that create stories should use the isolated test database.
+  - [x] Smoke/integration tests must not run against the user's active local working database.
+  - [x] Preferred option: add a separate Docker Compose service for tests, for example Postgres on host port `5433` with database/user/password such as `story_ai_test`.
+  - [x] Acceptable option: use a separate database on the same local Postgres server, for example `story_ai_test`, with a distinct `TEST_DATABASE_URL`.
+  - [x] The test runner should set `DATABASE_URL=$TEST_DATABASE_URL` or load a dedicated `.env.test`.
+  - [x] Test setup should apply schema to the test database before tests run.
+  - [x] Test teardown should truncate/drop test data without touching the development database.
+  - [x] Playwright smoke tests that create stories should use the isolated test database.
 - Add Playwright test:
-  - Create story from Library modal.
-  - Land on Writing with `chapterId`.
-  - Generate draft.
-  - Open Co-writer.
-  - Revise draft.
-  - Open Extraction.
-  - Run extraction.
-  - Commit memory.
-  - Open Bible and assert committed memory appears.
-- Use deterministic no-key fallbacks for CI/local tests.
+  - [x] Create story from Library modal.
+  - [x] Land on Writing with `chapterId`.
+  - [x] Generate draft.
+  - [x] Open Co-writer.
+  - [x] Revise draft.
+  - [x] Open Extraction.
+  - [x] Run extraction.
+  - [x] Commit memory.
+  - [x] Open Bible and assert committed memory appears.
+- [x] Use deterministic no-key fallbacks for CI/local tests.
 - Isolate DB state:
-  - Use unique test story titles.
-  - Prefer test database reset/truncate over deleting rows from the development database.
-  - Optionally delete test stories after run only inside the isolated test database.
+  - [x] Use unique test story titles.
+  - [x] Prefer test database reset/truncate over deleting rows from the development database.
+  - [x] Optionally delete test stories after run only inside the isolated test database.
 - Add API integration tests:
-  - Create story/chapter.
-  - Generate/revise.
-  - Extract/commit.
-  - Assert `chapter_memories`, `story_bibles`, `memory_items`.
+  - Optional future hardening: add lower-level API tests for story/chapter creation, generate/revise, extract/commit, and direct assertions on `chapter_memories`, `story_bibles`, and `memory_items`.
 - Acceptance criteria:
-  - [ ] One automated test covers the full happy path.
-  - [ ] Tests do not depend on OpenRouter network calls.
-  - [ ] Running smoke/integration tests never changes the user's real local story data.
+  - [x] One automated test covers the full happy path.
+  - [x] Tests do not depend on OpenRouter network calls.
+  - [x] Running smoke/integration tests never changes the user's real local story data.
 
-## 10. UX And Responsive Refinement — Open
+## 10. UX And Responsive Refinement — Partially Completed
 
-Status: Open.
+Status: Partially completed. Shared sidebar navigation now preserves `chapterId` or `storyId`, and `/bible?chapterId=...` resolves the matching story. Responsive drawer/sheet refinements and broader loading/error polish remain open.
 
 Goal: Make the app feel polished across viewport sizes.
 
@@ -322,15 +320,15 @@ Implementation details:
   - AI busy state.
   - DB/API error state.
 - Navigation:
-  - Keep selected story/chapter in URL.
-  - Ensure all nav links preserve `storyId` or `chapterId` where appropriate.
+  - [x] Keep selected story/chapter in URL.
+  - [x] Ensure shared sidebar nav links preserve `storyId` or `chapterId` where appropriate.
 - Accessibility:
   - Ensure all icon buttons have labels.
   - Ensure modal focus management.
   - Check color contrast for teal pills and muted text.
 - Acceptance criteria:
   - [ ] No major overlap or hidden controls on mobile.
-  - [ ] User can navigate the live story without losing selected chapter.
+  - [x] User can navigate the live story without losing selected chapter.
   - [ ] Common errors are visible and recoverable.
 
 ## 11. Later Production Work — Open

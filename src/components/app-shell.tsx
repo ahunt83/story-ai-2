@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   BookOpen,
   History,
@@ -91,6 +91,7 @@ export function AppShell({
 
 function SideNav({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const nav = (
     <aside className="flex h-full w-sidebar flex-col bg-primary-container px-6 py-8 text-on-primary-container">
@@ -107,11 +108,12 @@ function SideNav({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
+          const href = preserveLiveContext(item.href, searchParams);
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={href}
               onClick={onClose}
               className={cn(
                 "flex items-center gap-4 rounded-md px-4 py-3 text-sm font-bold transition",
@@ -140,6 +142,35 @@ function SideNav({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
       </div>
     </>
   );
+}
+
+function preserveLiveContext(href: string, searchParams: { get(name: string): string | null }) {
+  if (href === "/" || href.includes("?")) {
+    return href;
+  }
+
+  const params = new URLSearchParams();
+  const chapterId = searchParams.get("chapterId");
+  const storyId = searchParams.get("storyId");
+
+  if (href.startsWith("/writing")) {
+    if (chapterId) {
+      params.set("chapterId", chapterId);
+    } else if (storyId) {
+      params.set("storyId", storyId);
+    }
+  }
+
+  if (href === "/bible") {
+    if (storyId) {
+      params.set("storyId", storyId);
+    } else if (chapterId) {
+      params.set("chapterId", chapterId);
+    }
+  }
+
+  const query = params.toString();
+  return query ? `${href}?${query}` : href;
 }
 
 export function IconButton({ label, children }: { label: string; children: ReactNode }) {
