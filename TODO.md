@@ -5,7 +5,8 @@ This file tracks the remaining work after the initial MVP scaffold and live work
 Status after the current build pass:
 
 - Completed: items 1, 2, 3, 4, 5, 6, 7, 8, 9, and 10.
-- Still open: item 11 later production work.
+- Partially completed: item 11 later production work now has local email/password auth, user-owned stories, per-story model settings, and AI-call observability.
+- Still open: hosted deployment, backups/export, collaboration, sharing/export, cost controls/rate limits, and privacy/data-retention controls.
 
 Recommended build order:
 
@@ -331,17 +332,26 @@ Implementation details:
 
 ## 11. Later Production Work — Open
 
-Status: Open.
+Status: Partially complete.
 
 These are intentionally out of the current local MVP but should be tracked.
 
-- Authentication and user-owned stories.
+- [x] Authentication and user-owned stories.
 - Hosted Postgres with pgvector.
 - Deployment configuration.
 - Backups and export/import.
 - Collaboration.
 - Sharing/export to Markdown, DOCX, or PDF.
-- Per-story model settings.
-- Observability for AI calls and extraction quality.
+- [x] Per-story model settings.
+- [x] Observability for AI calls and extraction quality.
 - Cost controls and rate limits.
 - Privacy/data retention controls.
+
+Implemented production-readiness slice:
+
+- Local email/password signup/login/logout with secure opaque session cookies.
+- `users`, `sessions`, `story_model_settings`, and `ai_runs` database tables.
+- Story ownership via `stories.owner_user_id`; API routes require sessions and story-derived resources resolve through owner checks.
+- New story model settings routes and Settings UI for per-story generation, revision, extraction, embedding, temperature, and max-token settings.
+- `ai_runs` observability for generation, revision, memory check, next beat, extraction, Story Bible merge, and embeddings, including no-key fallback runs.
+- Isolated Playwright setup creates a deterministic test user and applies all generated migrations.

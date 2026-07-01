@@ -9,6 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, MemoryCard, SectionHeading } from "@/components/ui";
 import { apiFetch } from "@/lib/client-api";
 import type { Importance, StoryBible } from "@/lib/story-memory/schema";
+import type { StoryFoundationContext } from "@/lib/story-foundation/schema";
 
 type StorySummary = {
   id: string;
@@ -35,6 +36,8 @@ type BibleResponse = {
   openThreads: StoryBible["openThreads"];
   resolvedThreads: StoryBible["resolvedThreads"];
   warnings: StoryBible["continuityWarnings"];
+  foundationStatus: "draft" | "approved" | null;
+  foundationContext: StoryFoundationContext | null;
   memoryItems: MemoryRow[];
   lastUpdatedFromChapterNumber: number;
 };
@@ -136,6 +139,7 @@ export function StoryBibleWorkspace() {
     <AppShell
       title={story?.title ?? "Codex"}
       tabs={[
+        { label: "Foundation", href: story ? `/foundation?storyId=${story.id}` : "/foundation" },
         { label: "Writing", href: story ? `/writing?storyId=${story.id}` : "/writing" },
         { label: "Drafts", href: story ? `/writing/co-writer?storyId=${story.id}` : "/writing/co-writer" },
         { label: "Story Bible", href: story ? `/bible?storyId=${story.id}` : "/bible", active: true }
@@ -197,6 +201,21 @@ export function StoryBibleWorkspace() {
                 <Fact label="Current State" value={character?.statusAtChapterEnd ?? "No live character state yet."} />
                 <Fact label="Core Motivation" value={character?.goalsAndMotivations.join(" ") || "Approve memory to track goals and motivations."} />
               </div>
+            </div>
+
+          <div className="rounded-md border border-memory-border bg-white p-5">
+              <SectionHeading icon={<BookOpen size={16} />} title="Initial Foundation" />
+              {data?.foundationContext ? (
+                <div className="space-y-3 text-sm leading-6 text-on-surface-variant">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-primary">Status</span>
+                    <span className="rounded-full bg-intelligence-glow px-2 py-0.5 text-[11px] font-bold uppercase text-intelligence-teal">{data.foundationStatus}</span>
+                  </div>
+                  <Fact label="Premise" value={data.foundationContext.premise} />
+                  <Fact label="Reader Promise" value={data.foundationContext.readerPromise} />
+                  {story ? <Link href={`/foundation?storyId=${story.id}`} className="inline-flex text-sm font-bold text-intelligence-teal hover:text-primary">Review foundation</Link> : null}
+                </div>
+              ) : <p className="text-sm text-on-surface-variant">No initial foundation stored yet.</p>}
             </div>
 
             <div className="rounded-md border border-memory-border bg-white p-5">

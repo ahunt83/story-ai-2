@@ -34,6 +34,9 @@ Without `OPENROUTER_API_KEY`, AI routes intentionally use deterministic fallback
 - `src/components`: UI shell and client workspaces.
 - `src/db`: Drizzle connection and schema.
 - `src/lib/story-memory`: memory schemas, prompts, AI helpers, normalization, context builder.
+- `src/lib/auth.ts`: local email/password auth, session cookies, and session lookup helpers.
+- `src/lib/story-settings.ts`: per-story model settings defaults and resolution.
+- `src/lib/ai-runs.ts`: durable AI run logging helpers.
 - `src/lib/openrouter.ts`: OpenRouter client and deterministic embedding fallback.
 - `src/e2e`: Playwright smoke tests.
 - `src/e2e/global-setup.ts`: guarded Playwright test database reset and migration setup when `TEST_DATABASE_URL` is set.
@@ -45,6 +48,10 @@ Without `OPENROUTER_API_KEY`, AI routes intentionally use deterministic fallback
 Defined in `src/db/schema.ts`.
 
 - `stories`: story metadata and initial prompt.
+- `users`: local email/password accounts.
+- `sessions`: hashed opaque session tokens with expiry.
+- `story_model_settings`: per-story model overrides for generation, revision, extraction, embeddings, temperatures, and max tokens.
+- `ai_runs`: canonical operational log for AI calls, including model, operation, status, fallback usage, token usage, duration, provider errors, generation ids, validation status, repair status, and compact metadata.
 - `chapters`: chapter number, status, approved text.
 - `scenes`: ordered scene records with draft and approved text.
 - `draft_versions`: prior drafts saved before AI generation/revision replacement.
@@ -59,16 +66,39 @@ Streaming behavior:
 - Generation streams directly into the active scene and saves when the full response completes.
 - Revision streams into a preview; `POST /api/chapters/:chapterId/apply-revision` saves the accepted preview, preserves the previous draft version, and logs usage metadata.
 - Failed streaming attempts preserve failed-call metadata in `ai_messages`.
+- `ai_messages` remains the transcript/log of user and assistant content; `ai_runs` is the operational observability table.
+- Generation, revision, memory check, next beat, extraction, Story Bible merge, and memory embedding paths write `ai_runs`, including deterministic fallback runs.
+
+Auth and ownership:
+
+- Main app pages redirect unauthenticated users to `/login`.
+- API routes require a session except the auth endpoints.
+- `stories.owner_user_id` scopes stories to one owner. Story-derived resources resolve through their parent story and return not-found semantics for inaccessible IDs.
+- Legacy unowned local stories are claimed by the first authenticated user who accesses them; signup also claims all unowned stories when the first user is created.
+- Signup is intended for local bootstrap. After a user exists, new arbitrary signups are rejected.
+
+Model settings:
+
+- New stories copy defaults from `OPENROUTER_CHAT_MODEL`, `OPENROUTER_EXTRACT_MODEL`, and `OPENROUTER_EMBEDDING_MODEL`.
+- Story settings can override generation, revision, extraction, and embedding models plus generation/revision temperatures and max tokens.
+- Embedding dimensions remain environment/schema-level through `OPENROUTER_EMBEDDING_DIMENSIONS`.
 
 ## API Routes
 
 Story routes:
 
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 - `POST /api/stories`
 - `GET /api/stories`
 - `GET /api/stories/:storyId`
 - `POST /api/stories/:storyId/chapters`
 - `GET /api/stories/:storyId/bible?category=&importance=&q=`
+- `GET /api/stories/:storyId/model-settings`
+- `PATCH /api/stories/:storyId/model-settings`
+- `GET /api/stories/:storyId/ai-runs`
 
 Chapter routes:
 
@@ -90,11 +120,13 @@ Chapter routes:
 ## UI Routes
 
 - `/`: Library.
+- `/login`: Email/password sign in.
+- `/signup`: Local bootstrap signup.
 - `/writing`: Writing screen.
 - `/writing/co-writer`: AI co-writer/revision screen.
 - `/writing/extraction`: Memory extraction approval screen.
 - `/bible`: Story Bible explorer.
-- `/settings`: Basic settings notes.
+- `/settings`: Environment notes, per-story model settings, and recent AI runs.
 
 Live route conventions:
 
@@ -110,6 +142,7 @@ Live route conventions:
 - `ExtractionWorkspace`: live memory extraction, editable approval, include/exclude toggles, validation, and commit flow.
 - `WritingCanvas`: manuscript surface with editable textarea support.
 - `ContinuityContextPanel`: live context package/sidebar display.
+- `StorySettingsClient`: per-story model editor and recent AI run viewer.
 
 ## Verification Commands
 

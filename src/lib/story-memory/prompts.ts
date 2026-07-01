@@ -11,6 +11,15 @@ Write polished narrative prose for "${params.storyTitle}".
 
 Use the provided continuity context. Do not contradict known facts. Keep the style constraints in mind.
 
+Canon priority order:
+1. The user's latest writing direction.
+2. Written chapter canon and approved prose.
+3. The current Story Bible and extracted memory.
+4. The Story Foundation context.
+5. Earlier outline ideas or model inference.
+
+Treat the Story Foundation as an initial plan and style anchor, not as stronger canon than written chapters.
+
 WRITING DIRECTION:
 <<<
 ${params.direction}
@@ -30,6 +39,13 @@ export function buildRevisionPrompt(params: {
   return `You are revising a fiction draft.
 
 Return the full revised draft only. Preserve continuity and incorporate the user's command.
+
+Canon priority order:
+1. The user's latest revision command.
+2. Written chapter canon and approved prose.
+3. The current Story Bible and extracted memory.
+4. The Story Foundation context.
+5. Earlier outline ideas or model inference.
 
 USER COMMAND:
 <<<

@@ -1,9 +1,14 @@
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { memoryItems, memorySimilarity, storyBibles } from "@/db/schema";
+import { memoryItems, memorySimilarity, storyBibles, storyFoundations } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
-import { createEmbeddings } from "@/lib/openrouter";
+import { requireUser } from "@/lib/auth";
+import { createEmbeddingsWithModel } from "@/lib/openrouter";
+import { requireOwnedStory } from "@/lib/ownership";
+import { buildStoryFoundationContext } from "@/lib/story-foundation/context";
+import { storyFoundationSchema } from "@/lib/story-foundation/schema";
+import { resolveStoryModelSettings } from "@/lib/story-settings";
 import { storyBibleSchema } from "@/lib/story-memory/schema";
 
 const memoryCategories = memoryItems.category.enumValues;
@@ -11,14 +16,19 @@ const importanceValues = memoryItems.importance.enumValues;
 
 export async function GET(request: Request, context: { params: Promise<{ storyId: string }> }) {
   try {
+    const user = await requireUser();
     const { storyId } = await context.params;
+    await requireOwnedStory(storyId, user.id);
+    const modelSettings = await resolveStoryModelSettings(storyId);
     const url = new URL(request.url);
     const category = url.searchParams.get("category");
     const importance = url.searchParams.get("importance");
     const query = url.searchParams.get("q")?.trim();
 
     const [bible] = await db.select().from(storyBibles).where(eq(storyBibles.storyId, storyId)).limit(1);
+    const [foundation] = await db.select().from(storyFoundations).where(eq(storyFoundations.storyId, storyId)).limit(1);
     const parsedBible = bible?.bible ? storyBibleSchema.parse(bible.bible) : null;
+    const parsedFoundation = foundation?.foundation ? storyFoundationSchema.parse(foundation.foundation) : null;
     const normalizedCategory = category && memoryCategories.includes(category as typeof memoryCategories[number])
       ? category as typeof memoryCategories[number]
       : undefined;
@@ -30,7 +40,8 @@ export async function GET(request: Request, context: { params: Promise<{ storyId
       storyId,
       category: normalizedCategory,
       importance: normalizedImportance,
-      query
+      query,
+      embeddingModel: modelSettings.embeddingModel
     });
 
     return ok({
@@ -42,6 +53,8 @@ export async function GET(request: Request, context: { params: Promise<{ storyId
       openThreads: parsedBible?.openThreads ?? [],
       resolvedThreads: parsedBible?.resolvedThreads ?? [],
       warnings: parsedBible?.continuityWarnings ?? [],
+      foundationStatus: foundation?.status ?? null,
+      foundationContext: parsedFoundation ? buildStoryFoundationContext(parsedFoundation, foundation.status) : null,
       memoryItems: memoryRows,
       lastUpdatedFromChapterNumber: bible?.lastUpdatedFromChapterNumber ?? 0
     });
@@ -55,6 +68,7 @@ async function findMemoryRows(params: {
   category?: typeof memoryCategories[number];
   importance?: typeof importanceValues[number];
   query?: string;
+  embeddingModel: string;
 }) {
   const filters = [
     eq(memoryItems.storyId, params.storyId),
@@ -64,7 +78,7 @@ async function findMemoryRows(params: {
 
   if (params.query) {
     try {
-      const [embedding] = await createEmbeddings([params.query]);
+      const [embedding] = await createEmbeddingsWithModel([params.query], params.embeddingModel);
       if (embedding) {
         const rows = await db
           .select({

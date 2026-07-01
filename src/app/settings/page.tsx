@@ -1,10 +1,17 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { StorySettingsClient } from "@/components/story-settings-client";
 import { MemoryCard } from "@/components/ui";
+import { currentUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  if (!(await currentUser())) {
+    redirect("/login");
+  }
+
   const rows = [
     ["Chat model", env.openRouterChatModel],
     ["Extraction model", env.openRouterExtractModel],
@@ -18,6 +25,7 @@ export default function SettingsPage() {
       <AppShell title="Settings">
         <div className="mx-auto max-w-3xl px-5 py-10 md:px-8">
           <h2 className="headline-serif mb-6 text-3xl text-primary">Local MVP Settings</h2>
+          <StorySettingsClient />
           <MemoryCard title="OpenRouter">
             <p className="mb-4">Configure `OPENROUTER_API_KEY` and model names in `.env.local`. Without a key, API routes use deterministic local fallbacks for development.</p>
             <div className="divide-y divide-outline-variant rounded-md border border-outline-variant">

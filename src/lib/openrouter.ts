@@ -306,6 +306,10 @@ export async function completeJson<T>(params: {
 }
 
 export async function createEmbeddings(input: string[]) {
+  return createEmbeddingsWithModel(input, env.openRouterEmbeddingModel);
+}
+
+export async function createEmbeddingsWithModel(input: string[], model: string) {
   if (input.length === 0) {
     return [];
   }
@@ -315,7 +319,7 @@ export async function createEmbeddings(input: string[]) {
   }
 
   const json = await openRouterFetch("/embeddings", {
-    model: env.openRouterEmbeddingModel,
+    model,
     input,
     encoding_format: "float"
   });

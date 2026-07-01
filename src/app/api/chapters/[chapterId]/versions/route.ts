@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { draftVersions, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { createId } from "@/lib/ids";
+import { requireOwnedChapter } from "@/lib/ownership";
 
 const createVersionSchema = z.object({
   sceneId: z.string().min(1),
@@ -13,7 +15,9 @@ const createVersionSchema = z.object({
 
 export async function GET(_request: Request, context: { params: Promise<{ chapterId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId } = await context.params;
+    await requireOwnedChapter(chapterId, user.id);
     const versions = await db
       .select()
       .from(draftVersions)
@@ -28,7 +32,9 @@ export async function GET(_request: Request, context: { params: Promise<{ chapte
 
 export async function POST(request: Request, context: { params: Promise<{ chapterId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId } = await context.params;
+    await requireOwnedChapter(chapterId, user.id);
     const input = createVersionSchema.parse(await request.json());
     const [scene] = await db.select().from(scenes).where(eq(scenes.id, input.sceneId)).limit(1);
 

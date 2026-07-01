@@ -1,17 +1,16 @@
 import { asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chapters, scenes, stories } from "@/db/schema";
+import { chapters, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
+import { requireOwnedStory } from "@/lib/ownership";
 
 export async function GET(_request: Request, context: { params: Promise<{ storyId: string }> }) {
   try {
+    const user = await requireUser();
     const { storyId } = await context.params;
-    const [story] = await db.select().from(stories).where(eq(stories.id, storyId)).limit(1);
-
-    if (!story) {
-      return ok({ error: "Story not found" }, { status: 404 });
-    }
+    const story = await requireOwnedStory(storyId, user.id);
 
     const storyChapters = await db.select().from(chapters).where(eq(chapters.storyId, storyId)).orderBy(asc(chapters.chapterNumber));
     const chapterIds = storyChapters.map((chapter) => chapter.id);

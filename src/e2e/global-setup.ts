@@ -1,7 +1,13 @@
-import { readFile } from "node:fs/promises";
+import { scrypt as nodeScrypt } from "node:crypto";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import postgres from "postgres";
+
+const scrypt = promisify(nodeScrypt);
+export const testEmail = "playwright@example.com";
+export const testPassword = "playwright-password";
 
 export default async function globalSetup() {
   const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -18,16 +24,35 @@ export default async function globalSetup() {
     await sql.unsafe("CREATE SCHEMA public");
     await sql.unsafe("CREATE EXTENSION IF NOT EXISTS vector");
 
-    const migration = await readFile(join(process.cwd(), "drizzle", "0000_heavy_post.sql"), "utf8");
-    for (const statement of migration.split("--> statement-breakpoint")) {
-      const trimmed = statement.trim();
-      if (trimmed) {
-        await sql.unsafe(trimmed);
+    const migrationDir = join(process.cwd(), "drizzle");
+    const migrations = (await readdir(migrationDir))
+      .filter((file) => /^\d+_.*\.sql$/.test(file))
+      .sort();
+
+    for (const file of migrations) {
+      const migration = await readFile(join(migrationDir, file), "utf8");
+      for (const statement of migration.split("--> statement-breakpoint")) {
+        const trimmed = statement.trim();
+        if (trimmed) {
+          await sql.unsafe(trimmed);
+        }
       }
     }
+
+    await sql`
+      insert into users (id, email, display_name, password_hash)
+      values ('user_playwright', ${testEmail}, 'Playwright User', ${await hashTestPassword(testPassword)})
+      on conflict (email) do nothing
+    `;
   } finally {
     await sql.end({ timeout: 5 });
   }
+}
+
+async function hashTestPassword(password: string) {
+  const salt = "playwright-test-salt";
+  const key = await scrypt(password, salt, 64) as Buffer;
+  return `scrypt:${salt}:${key.toString("base64url")}`;
 }
 
 function assertSafeTestDatabase(databaseUrl: string) {

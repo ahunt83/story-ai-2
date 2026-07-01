@@ -1,19 +1,11 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chapters, scenes, stories } from "@/db/schema";
+import { scenes } from "@/db/schema";
+import { requireOwnedChapter } from "@/lib/ownership";
 
-export async function loadChapterBundle(chapterId: string) {
-  const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId)).limit(1);
-  if (!chapter) {
-    throw new Error("Chapter not found");
-  }
-
-  const [story] = await db.select().from(stories).where(eq(stories.id, chapter.storyId)).limit(1);
-  if (!story) {
-    throw new Error("Story not found");
-  }
-
+export async function loadChapterBundle(chapterId: string, userId: string) {
+  const { chapter, story } = await requireOwnedChapter(chapterId, userId);
   const chapterScenes = await db
     .select()
     .from(scenes)

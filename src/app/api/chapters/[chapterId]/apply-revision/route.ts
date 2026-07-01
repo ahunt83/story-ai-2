@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { aiMessages, draftVersions, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createId } from "@/lib/ids";
 import { loadChapterBundle } from "../helpers";
@@ -23,9 +24,10 @@ const applyRevisionSchema = z.object({
 
 export async function POST(request: Request, context: { params: Promise<{ chapterId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId } = await context.params;
     const input = applyRevisionSchema.parse(await request.json());
-    const bundle = await loadChapterBundle(chapterId);
+    const bundle = await loadChapterBundle(chapterId, user.id);
     const targetScene = bundle.scenes.find((scene) => scene.id === input.sceneId);
 
     if (!targetScene) {

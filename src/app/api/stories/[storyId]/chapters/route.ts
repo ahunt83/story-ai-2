@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { chapters, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { createId } from "@/lib/ids";
+import { requireOwnedStory } from "@/lib/ownership";
 
 const createChapterSchema = z.object({
   title: z.string().optional()
@@ -12,7 +14,9 @@ const createChapterSchema = z.object({
 
 export async function POST(request: Request, context: { params: Promise<{ storyId: string }> }) {
   try {
+    const user = await requireUser();
     const { storyId } = await context.params;
+    await requireOwnedStory(storyId, user.id);
     const input = createChapterSchema.parse(await request.json().catch(() => ({})));
     const [latest] = await db
       .select({ chapterNumber: chapters.chapterNumber })

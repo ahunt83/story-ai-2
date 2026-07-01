@@ -3,12 +3,14 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiMessages, chapterMemories, draftVersions } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { loadChapterBundle } from "./helpers";
 
 export async function GET(_request: Request, context: { params: Promise<{ chapterId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId } = await context.params;
-    const bundle = await loadChapterBundle(chapterId);
+    const bundle = await loadChapterBundle(chapterId, user.id);
 
     const [latestMemory] = await db
       .select()

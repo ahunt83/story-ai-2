@@ -378,6 +378,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
       activeTab={initialMode === "cowriter" ? "Drafts" : "Outline"}
       status={busy === "generate" || busy === "revise" ? <AiStatus label={busy === "generate" ? "Generating..." : "Revising..."} /> : undefined}
       tabs={[
+        { label: "Foundation", href: bundle ? `/foundation?storyId=${bundle.story.id}` : "/foundation" },
         { label: "Chapter", href: chapterId ? `/writing?chapterId=${chapterId}` : "/writing", active: initialMode === "draft" },
         { label: "Drafts", href: chapterId ? `/writing/co-writer?chapterId=${chapterId}` : "/writing/co-writer", active: initialMode === "cowriter" },
         { label: "Bible", href: bundle ? `/bible?storyId=${bundle.story.id}` : "/bible" }

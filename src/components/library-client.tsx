@@ -69,11 +69,11 @@ export function LibraryClient() {
     const genreToneNotes = String(form.get("genreToneNotes") ?? "");
 
     try {
-      const result = await apiFetch<{ storyId: string; chapterId: string; sceneId: string }>("/api/stories", {
+      const result = await apiFetch<{ storyId: string; chapterId: string; sceneId: string; foundationId: string }>("/api/stories", {
         method: "POST",
         body: JSON.stringify({ title, initialPrompt, genreToneNotes })
       });
-      window.location.href = `/writing?chapterId=${result.chapterId}`;
+      window.location.href = `/foundation?storyId=${result.storyId}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create story");
       setCreating(false);

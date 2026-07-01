@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { storyFoundationContextSchema } from "@/lib/story-foundation/schema";
+
 export const importanceSchema = z.enum(["critical", "major", "minor"]);
 export const persistenceSchema = z.enum(["permanent", "until_resolved", "temporary", "unclear"]);
 export const narrativePersonSchema = z.enum(["first", "second", "third", "mixed", "unclear"]);
@@ -208,6 +210,7 @@ export const storyBibleSchema = z.object({
 
 export const chapterContextSchema = z.object({
   storyBible: storyBibleSchema.nullable(),
+  storyFoundationContext: storyFoundationContextSchema.nullable().optional(),
   previousLongSummary: z.string().optional(),
   recentMediumSummaries: z.array(z.object({ chapterNumber: z.number(), summary: z.string() })),
   olderShortSummaries: z.array(z.object({ chapterNumber: z.number(), summary: z.string() })),

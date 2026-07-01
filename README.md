@@ -1,6 +1,6 @@
 # Codex Story AI
 
-A local single-user AI story writing app with chapter drafting, co-writer revisions, structured continuity memory, story bible maintenance, and semantic memory retrieval.
+A local-first AI story writing app with email/password login, user-owned stories, per-story model settings, chapter drafting, co-writer revisions, structured continuity memory, story bible maintenance, AI-call observability, and semantic memory retrieval.
 
 ## Quick Start
 
@@ -37,6 +37,15 @@ A local single-user AI story writing app with chapter drafting, co-writer revisi
 
 Open http://localhost:3000.
 
+`npm run db:seed` creates a sample local account:
+
+```text
+email: local@example.com
+password: local-password-123
+```
+
+Without seed data, create the first account at `/signup`.
+
 ## Isolated E2E Tests
 
 The mutating Playwright workflow uses a separate test database so local story data is not touched:
@@ -46,12 +55,13 @@ docker-compose up -d test-db
 npm run test:e2e:isolated
 ```
 
-`test:e2e:isolated` sets `TEST_DATABASE_URL=postgres://story_ai:story_ai@localhost:5433/story_ai_test`. Playwright runs Next on `127.0.0.1:3001` with `.next-test`, resets the test database, applies the generated migration, clears `OPENROUTER_API_KEY`, and uses deterministic local AI fallbacks.
+`test:e2e:isolated` sets `TEST_DATABASE_URL=postgres://story_ai:story_ai@localhost:5433/story_ai_test`. Playwright runs Next on `127.0.0.1:3001` with `.next-test`, resets the test database, applies generated migrations, creates `playwright@example.com` / `playwright-password`, clears `OPENROUTER_API_KEY`, and uses deterministic local AI fallbacks.
 
 ## Notes
 
 - The app uses OpenRouter for drafting, revision, structured memory extraction, story bible merging, and embeddings.
 - Without an `OPENROUTER_API_KEY`, server routes fall back to deterministic local text so the product flow remains testable.
+- Settings includes per-story model overrides and recent `ai_runs` observability.
 - `npm run db:push` remains available for local schema prototyping; normal setup should use generated migrations.
 - The UI is based on the attached Stitch designs: paper-first writing canvas, charcoal navigation, teal AI states, and compact continuity cards.
 

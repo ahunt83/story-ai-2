@@ -1,6 +1,6 @@
 # Continuation Guide For Future Codex Sessions
 
-This repository is a local single-user AI story writing app. It was started from a clean repo using two user-provided inputs:
+This repository is a local-first AI story writing app with email/password login, user-owned stories, per-story model settings, and AI-call observability. It was started from a clean repo using two user-provided inputs:
 
 - A memory-system implementation brief at `/Users/andy/Downloads/codex_story_memory_implementation_brief.md`.
 - A Stitch design archive at `/Users/andy/Downloads/stitch_ai_narrative_writing_interface.zip`.
@@ -24,9 +24,11 @@ Built and verified:
 
 - Next.js App Router app with TypeScript and Tailwind.
 - Postgres + pgvector via Docker Compose.
-- Drizzle schema for stories, chapters, scenes, draft versions, AI messages, chapter memories, story bibles, and normalized memory items.
+- Drizzle schema for users, sessions, user-owned stories, per-story model settings, chapters, scenes, draft versions, AI messages, AI runs, chapter memories, story bibles, and normalized memory items.
 - OpenRouter adapter for generation, revision, extraction, story bible merge, and embeddings.
 - Deterministic local AI fallbacks when `OPENROUTER_API_KEY` is empty.
+- Local email/password auth with secure session cookies.
+- Per-story model settings and recent AI run observability in Settings.
 - Library screen with live story loading and story creation modal.
 - Writing screen with chapter/scene navigation, editable manuscript canvas, autosave, live draft generation, and manual snapshots.
 - Co-writer screen with streamed selected-scene revision previews, accept/reject review, and draft version history restore.
@@ -66,6 +68,15 @@ npm run dev
 
 Open the app at `http://127.0.0.1:3000` or `http://localhost:3000`.
 
+`npm run db:seed` creates a local sample account:
+
+```text
+email: local@example.com
+password: local-password-123
+```
+
+If you do not seed, create the first account at `/signup`; first signup also claims any legacy unowned stories.
+
 If Docker fails because the daemon is unavailable, this machine previously used Colima:
 
 ```bash
@@ -80,7 +91,7 @@ docker-compose up -d test-db
 npm run test:e2e:isolated
 ```
 
-The Playwright global setup resets only a local database whose name includes `test`, applies the generated migration, and clears `OPENROUTER_API_KEY` for deterministic no-network AI fallbacks. Isolated runs use `127.0.0.1:3001` and `.next-test` so they can run beside a normal dev server on port 3000.
+The Playwright global setup resets only a local database whose name includes `test`, applies all generated migrations, creates `playwright@example.com` / `playwright-password`, and clears `OPENROUTER_API_KEY` for deterministic no-network AI fallbacks. Isolated runs use `127.0.0.1:3001` and `.next-test` so they can run beside a normal dev server on port 3000.
 
 ## Documentation Rule
 
@@ -88,10 +99,10 @@ Future Codex sessions should update documentation whenever a significant build c
 
 Update docs when changing:
 
-- public routes or API contracts,
+- public routes, auth behavior, or API contracts,
 - database schema or migrations,
 - story memory schema, extraction prompts, retrieval, or validation,
-- OpenRouter/model behavior,
+- OpenRouter/model behavior or AI run observability,
 - UI routes, layout conventions, or design tokens,
 - setup, test, or deployment commands,
 - remaining work or project priorities.
@@ -100,17 +111,18 @@ Use this rule before final handoff: if a future session would need to know it, w
 
 ## Important Implementation Defaults
 
-- Keep the app local single-user until explicitly asked otherwise.
+- Keep the app local-first. Story ownership is single-owner; shared membership/collaboration is not implemented yet.
 - Prefer Postgres JSONB for full memories and normalized `memory_items` for retrieval.
 - Keep deterministic no-key AI fallbacks so development and tests do not require OpenRouter.
+- Keep auth local and dependency-light unless a future task explicitly chooses an external provider.
 - Keep sample display data for useful no-story/no-memory empty states.
 - Preserve the attached design direction: paper-first writing, charcoal system navigation, teal AI/memory accents, serif manuscript text.
 - Add tests with each substantial workflow change.
 
 ## Recommended Next Work
 
-The local MVP checklist is complete. The strongest next non-production slice is optional API-level integration tests for direct database assertions around story/chapter creation, extract/commit, and memory item persistence.
+The strongest next non-production slice is API-level integration tests for auth, ownership boundaries, story/chapter creation, model settings, extract/commit, `ai_runs`, and memory item persistence.
 
-Production hardening remains tracked separately in `TODO.md`, including deployment/auth/cost-control work.
+Production hardening remains tracked separately in `TODO.md`, including deployment, backups/export, collaboration, privacy controls, and cost/rate-limit work.
 
 See `TODO.md` for detailed implementation steps and acceptance criteria.

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { completeJson, completeTextWithMetadata, streamTextWithMetadata } from "@/lib/openrouter";
 import { env } from "@/lib/env";
+import type { ResolvedStoryModelSettings } from "@/lib/story-settings";
 import { createMockChapterMemory, mergeBibleLocally } from "./mock";
 import {
   buildBibleMergePrompt,
@@ -16,6 +17,7 @@ export async function generateDraft(params: {
   storyTitle: string;
   direction: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   const result = await generateDraftRun(params);
   return result.content;
@@ -25,6 +27,7 @@ export async function generateDraftRun(params: {
   storyTitle: string;
   direction: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   return completeTextWithMetadata({
     ...generateDraftRequest(params)
@@ -35,6 +38,7 @@ export function streamGenerateDraftRun(params: {
   storyTitle: string;
   direction: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
   signal?: AbortSignal;
 }) {
   return streamTextWithMetadata({
@@ -47,6 +51,7 @@ export async function reviseDraft(params: {
   currentDraft: string;
   command: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   const result = await reviseDraftRun(params);
   return result.content;
@@ -56,6 +61,7 @@ export async function reviseDraftRun(params: {
   currentDraft: string;
   command: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   return completeTextWithMetadata({
     ...reviseDraftRequest(params)
@@ -66,6 +72,7 @@ export function streamReviseDraftRun(params: {
   currentDraft: string;
   command: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
   signal?: AbortSignal;
 }) {
   return streamTextWithMetadata({
@@ -78,8 +85,12 @@ function generateDraftRequest(params: {
   storyTitle: string;
   direction: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   return {
+    model: params.modelSettings?.chatModel,
+    temperature: params.modelSettings?.generationTemperature,
+    maxTokens: params.modelSettings?.maxTokens,
     messages: [
       { role: "system" as const, content: "You are a literary fiction co-writer who respects continuity." },
       { role: "user" as const, content: buildGenerationPrompt(params) }
@@ -92,8 +103,12 @@ function reviseDraftRequest(params: {
   currentDraft: string;
   command: string;
   context: ChapterContext;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   return {
+    model: params.modelSettings?.revisionModel,
+    temperature: params.modelSettings?.revisionTemperature,
+    maxTokens: params.modelSettings?.maxTokens,
     messages: [
       { role: "system" as const, content: "You revise fiction prose and return the full updated draft only." },
       { role: "user" as const, content: buildRevisionPrompt(params) }
@@ -107,12 +122,13 @@ export async function extractChapterMemory(params: {
   chapterNumber: number;
   title?: string;
   context?: ChapterContext | null;
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   const fallback = createMockChapterMemory(params.chapterText, params.chapterNumber, params.title);
 
   try {
     return await completeJson({
-      model: env.openRouterExtractModel,
+      model: params.modelSettings?.extractionModel ?? env.openRouterExtractModel,
       schema: chapterMemorySchema,
       format: {
         name: "ChapterMemory",
@@ -130,7 +146,7 @@ export async function extractChapterMemory(params: {
     }
 
     const repaired = await completeJson({
-      model: env.openRouterExtractModel,
+      model: params.modelSettings?.extractionModel ?? env.openRouterExtractModel,
       schema: chapterMemorySchema,
       format: {
         name: "ChapterMemory",
@@ -150,12 +166,13 @@ export async function extractChapterMemory(params: {
 export async function mergeStoryBible(params: {
   existingStoryBible: StoryBible | null;
   chapterMemory: Parameters<typeof mergeBibleLocally>[1];
+  modelSettings?: ResolvedStoryModelSettings;
 }) {
   const fallback = mergeBibleLocally(params.existingStoryBible, params.chapterMemory);
 
   try {
     return await completeJson({
-      model: env.openRouterExtractModel,
+      model: params.modelSettings?.extractionModel ?? env.openRouterExtractModel,
       schema: storyBibleSchema,
       format: {
         name: "StoryBible",

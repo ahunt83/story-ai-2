@@ -3,11 +3,15 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { draftVersions, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { createId } from "@/lib/ids";
+import { requireOwnedChapter } from "@/lib/ownership";
 
 export async function POST(_request: Request, context: { params: Promise<{ chapterId: string; versionId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId, versionId } = await context.params;
+    await requireOwnedChapter(chapterId, user.id);
     const [version] = await db
       .select()
       .from(draftVersions)

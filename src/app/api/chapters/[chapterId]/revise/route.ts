@@ -3,13 +3,16 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { aiMessages, draftVersions, scenes } from "@/db/schema";
+import { startAiRun } from "@/lib/ai-runs";
 import { fail, ok } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createId } from "@/lib/ids";
 import { OpenRouterRequestError, OpenRouterStreamError, type OpenRouterUsage } from "@/lib/openrouter";
 import { reviseDraftRun, streamReviseDraftRun } from "@/lib/story-memory/ai";
 import { buildContextForChapter } from "@/lib/story-memory/context";
 import { createMockContext } from "@/lib/story-memory/mock";
+import { resolveStoryModelSettings } from "@/lib/story-settings";
 import { loadChapterBundle } from "../helpers";
 
 const reviseSchema = z.object({
@@ -19,9 +22,10 @@ const reviseSchema = z.object({
 
 export async function POST(request: Request, context: { params: Promise<{ chapterId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId } = await context.params;
     const input = reviseSchema.parse(await request.json());
-    const bundle = await loadChapterBundle(chapterId);
+    const bundle = await loadChapterBundle(chapterId, user.id);
     const targetScene = input.sceneId
       ? bundle.scenes.find((scene) => scene.id === input.sceneId)
       : bundle.scenes[0];
@@ -30,14 +34,24 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       throw new Error("Scene not found");
     }
 
+    const modelSettings = await resolveStoryModelSettings(bundle.story.id);
     const chapterContext = await buildContextForChapter({
       storyId: bundle.story.id,
       targetChapterNumber: bundle.chapter.chapterNumber,
-      query: input.command
+      query: input.command,
+      embeddingModel: modelSettings.embeddingModel
     }).catch(() => createMockContext());
 
     if (wantsStreaming(request)) {
       const encoder = new TextEncoder();
+      const aiRun = await startAiRun({
+        userId: user.id,
+        storyId: bundle.story.id,
+        chapterId,
+        sceneId: targetScene.id,
+        operation: "revise",
+        model: modelSettings.revisionModel
+      });
 
       return new Response(new ReadableStream({
         async start(controller) {
@@ -52,6 +66,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
               currentDraft: targetScene.draftText,
               command: input.command,
               context: chapterContext,
+              modelSettings,
               signal: request.signal
             })) {
               if (event.type === "delta") {
@@ -68,8 +83,10 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
               throw new Error("OpenRouter returned an empty revision.");
             }
 
+            await aiRun.succeed({ usage, fallbackUsed: !env.openRouterApiKey, generationId });
             controller.enqueue(jsonLine(encoder, { type: "complete", draft: revisedDraft, context: chapterContext, usage, generationId, fallbackUsed: !env.openRouterApiKey }));
           } catch (error) {
+            await aiRun.fail(error, { fallbackUsed: !env.openRouterApiKey, generationId });
             await storeStreamFailure({
               storyId: bundle.story.id,
               chapterId,
@@ -92,13 +109,23 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
     }
 
     let run: Awaited<ReturnType<typeof reviseDraftRun>>;
+    const aiRun = await startAiRun({
+      userId: user.id,
+      storyId: bundle.story.id,
+      chapterId,
+      sceneId: targetScene.id,
+      operation: "revise",
+      model: modelSettings.revisionModel
+    });
     try {
       run = await reviseDraftRun({
         currentDraft: targetScene.draftText,
         command: input.command,
-        context: chapterContext
+        context: chapterContext,
+        modelSettings
       });
     } catch (error) {
+      await aiRun.fail(error, { fallbackUsed: !env.openRouterApiKey });
       await db.insert(aiMessages).values({
         id: createId("msg"),
         storyId: bundle.story.id,
@@ -133,6 +160,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       ]);
     });
 
+    await aiRun.succeed({ usage: run.usage, fallbackUsed: run.fallbackUsed });
     return ok({ draft: revisedDraft, context: chapterContext });
   } catch (error) {
     return fail(error);

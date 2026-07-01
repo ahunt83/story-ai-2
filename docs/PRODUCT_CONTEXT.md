@@ -28,35 +28,40 @@ Summaries are for narrative flow. Structured memory is for continuity.
 
 Do not rely only on summaries. Structured memory must track what characters know, believe, want, own, promise, hide, and what remains unresolved.
 
-## MVP Scope
+## Current Scope
 
 Current intended scope:
 
-- Local single-user app.
-- No auth, billing, collaboration, or deployment.
+- Local-first app with real email/password login and user-owned stories.
+- Multiple users are supported at the ownership boundary, but collaboration and shared stories are not in scope yet.
+- No billing, OAuth, collaboration, or deployment automation.
 - Docker Postgres is the database.
 - OpenRouter is the AI provider.
+- Per-story model settings can override generation, revision, extraction, and embedding models.
 - Chapters can contain scenes, but memory extraction commits at chapter level.
 - AI revisions stream into a reviewable preview; accepting replaces the active draft while preserving prior versions.
 - Embeddings are included from the start through pgvector.
+- AI calls are logged to `ai_runs` for local observability.
 
 ## Current Product State
 
 Live flows currently implemented:
 
+- Signup/login/logout with secure local sessions.
 - Library loads real local stories.
 - New Story modal creates story, Chapter 1, Opening Scene, and Story Bible.
 - Writing screen generates a draft into the active chapter.
 - Co-writer screen streams revision previews and saves previous draft versions when changes are accepted.
 - Memory Check and Suggest Next Beat use context-aware backend routes.
-- Extraction screen runs memory extraction and commits memory to the Story Bible.
+- Extraction screen runs memory extraction, supports editing/toggling extracted memory, and commits approved memory to the Story Bible.
+- Story Bible explorer reads live story memory with filters and semantic search.
+- Settings includes per-story model overrides and recent AI run observability.
 
 Still prototype or partial:
 
-- Story Bible explorer UI mostly displays sample data.
-- Memory approval cards display extracted data but do not yet support full editing/toggling.
-- Writing canvas displays live draft text but is not yet directly editable/autosaved.
-- Chapter/scene navigation is minimal.
+- User administration is intentionally minimal after first local signup.
+- Collaboration and shared story membership are deferred.
+- Cost estimation is deferred until reliable model pricing is available.
 
 ## User Experience Direction
 

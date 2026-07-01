@@ -6,6 +6,7 @@ import {
   BookOpen,
   History,
   Home,
+  Landmark,
   Menu,
   MoreVertical,
   PenLine,
@@ -19,10 +20,12 @@ import {
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui";
+import { apiFetch } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Library", icon: Home },
+  { href: "/foundation", label: "Foundation", icon: Landmark },
   { href: "/writing", label: "Writing", icon: PenLine },
   { href: "/bible", label: "Story Bible", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings }
@@ -82,10 +85,24 @@ export function AppShell({
             <IconButton label="More"><MoreVertical size={19} /></IconButton>
           </div>
           {action}
+          <AccountMenu />
         </div>
       </header>
       <main className="desktop-shell-offset min-h-screen pt-16 lg:ml-sidebar">{children}</main>
     </div>
+  );
+}
+
+function AccountMenu() {
+  async function logout() {
+    await apiFetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
+  return (
+    <button onClick={logout} className="rounded-md border border-outline-variant bg-white px-3 py-2 text-xs font-bold text-on-surface-variant transition hover:border-intelligence-teal hover:text-primary">
+      Sign Out
+    </button>
   );
 }
 
@@ -158,6 +175,14 @@ function preserveLiveContext(href: string, searchParams: { get(name: string): st
       params.set("chapterId", chapterId);
     } else if (storyId) {
       params.set("storyId", storyId);
+    }
+  }
+
+  if (href === "/foundation") {
+    if (storyId) {
+      params.set("storyId", storyId);
+    } else if (chapterId) {
+      params.set("chapterId", chapterId);
     }
   }
 

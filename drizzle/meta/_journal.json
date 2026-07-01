@@ -8,6 +8,20 @@
       "when": 1782932895414,
       "tag": "0000_heavy_post",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782939961605,
+      "tag": "0001_wide_callisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782940000000,
+      "tag": "0002_initial_story_foundation",
+      "breakpoints": true
     }
   ]
 }

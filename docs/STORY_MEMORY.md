@@ -17,6 +17,7 @@ When a chapter is finalized:
 7. User can review, edit, include, or exclude extracted memory in the extraction UI.
 8. Client validation runs `chapterMemorySchema.safeParse` before commit.
 9. Commit updates the Story Bible, replaces prior normalized rows for the chapter memory, creates embeddings, and marks the chapter approved.
+10. Extraction, Story Bible merge, and embedding work writes `ai_runs` rows for observability.
 
 ## Core Types
 
@@ -143,6 +144,7 @@ Current implementation:
 - Builds deterministic summary windows.
 - Pulls critical facts and major/critical open threads.
 - Uses embeddings when `query` is supplied.
+- Uses the selected story's embedding model for semantic retrieval.
 - Supports `characters`, `categories`, and `limit` filters in the context API.
 - Falls back to recent important memory items if no query/embedding.
 - Boosts critical/major/open-thread/continuity-warning rows after semantic matching.
@@ -162,6 +164,7 @@ AI uses:
 - chat completions for generation/revision,
 - structured JSON output for extraction/merge where supported,
 - embeddings for memory item retrieval.
+- per-story model settings when present, falling back to environment defaults.
 
 No-key behavior:
 
@@ -177,6 +180,9 @@ Production behavior:
 - OpenRouter auth, insufficient credits, rate limits, and structured-output support errors are mapped to user-facing messages.
 - Generation/revision store returned token usage in `ai_messages.metadata` when available.
 - Failed generation/revision attempts are stored in `ai_messages.metadata` with `status: "failed"`.
+- `ai_runs` stores operational metadata for generation, revision, memory check, next beat, extraction, Story Bible merge, and embeddings.
+- `ai_runs` captures operation, model, status, fallback usage, token usage, duration, generation id, provider errors, validation status, repair status, and compact metadata such as memory item count.
+- The Settings screen shows recent story-scoped AI runs.
 - Generation streams directly into the active scene and persists only after the stream completes.
 - Revision streams into a preview; accepting the preview persists it and stores the previous draft version.
 - Keep extraction non-streaming because structured JSON validation is simpler.

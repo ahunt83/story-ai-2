@@ -119,6 +119,7 @@ export function mergeBibleLocally(existing: StoryBible | null, memory: ChapterMe
 export function createMockContext(): ChapterContext {
   return {
     storyBible: emptyBible,
+    storyFoundationContext: null,
     previousLongSummary: "The previous chapter established a charged emotional state and a concrete continuity trail.",
     recentMediumSummaries: [],
     olderShortSummaries: [],

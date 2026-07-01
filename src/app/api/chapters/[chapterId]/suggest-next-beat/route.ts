@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+import { startAiRun } from "@/lib/ai-runs";
 import { fail, ok } from "@/lib/api";
-import { completeText } from "@/lib/openrouter";
+import { requireUser } from "@/lib/auth";
+import { completeTextWithMetadata } from "@/lib/openrouter";
 import { buildContextForChapter } from "@/lib/story-memory/context";
 import { createMockContext } from "@/lib/story-memory/mock";
+import { resolveStoryModelSettings } from "@/lib/story-settings";
 import { chapterTextFromScenes, loadChapterBundle } from "../helpers";
 
 const nextBeatSchema = z.object({
@@ -12,16 +15,29 @@ const nextBeatSchema = z.object({
 
 export async function POST(request: Request, context: { params: Promise<{ chapterId: string }> }) {
   try {
+    const user = await requireUser();
     const { chapterId } = await context.params;
     const input = nextBeatSchema.parse(await request.json().catch(() => ({})));
-    const bundle = await loadChapterBundle(chapterId);
+    const bundle = await loadChapterBundle(chapterId, user.id);
+    const modelSettings = await resolveStoryModelSettings(bundle.story.id);
     const chapterContext = await buildContextForChapter({
       storyId: bundle.story.id,
       targetChapterNumber: bundle.chapter.chapterNumber,
-      query: input.direction ?? chapterTextFromScenes(bundle.scenes)
+      query: input.direction ?? chapterTextFromScenes(bundle.scenes),
+      embeddingModel: modelSettings.embeddingModel
     }).catch(() => createMockContext());
+    const aiRun = await startAiRun({
+      userId: user.id,
+      storyId: bundle.story.id,
+      chapterId,
+      operation: "suggest_next_beat",
+      model: modelSettings.chatModel
+    });
 
-    const result = await completeText({
+    const run = await completeTextWithMetadata({
+      model: modelSettings.chatModel,
+      temperature: modelSettings.generationTemperature,
+      maxTokens: Math.min(modelSettings.maxTokens, 900),
       messages: [
         { role: "system", content: "You suggest next story beats while protecting continuity." },
         {
@@ -30,9 +46,13 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
         }
       ],
       fallback: "1. Let the mirror reveal one concrete inconsistency.\n2. Force Elias to decide whether Elena is real or remembered.\n3. End the scene on a question that can be tracked as an open thread."
+    }).catch(async (error) => {
+      await aiRun.fail(error);
+      throw error;
     });
 
-    return ok({ result, context: chapterContext });
+    await aiRun.succeed({ usage: run.usage, fallbackUsed: run.fallbackUsed });
+    return ok({ result: run.content, context: chapterContext });
   } catch (error) {
     return fail(error);
   }

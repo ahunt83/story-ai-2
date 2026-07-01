@@ -1,8 +1,11 @@
 import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chapterMemories, memoryItems, memorySimilarity, storyBibles } from "@/db/schema";
-import { createEmbeddings } from "@/lib/openrouter";
+import { chapterMemories, memoryItems, memorySimilarity, storyBibles, storyFoundations } from "@/db/schema";
+import { createEmbeddingsWithModel } from "@/lib/openrouter";
+import { env } from "@/lib/env";
+import { buildStoryFoundationContext } from "@/lib/story-foundation/context";
+import { storyFoundationSchema } from "@/lib/story-foundation/schema";
 import { storyBibleSchema, type ChapterContext } from "./schema";
 
 export async function buildContextForChapter(params: {
@@ -12,12 +15,23 @@ export async function buildContextForChapter(params: {
   characters?: string[];
   categories?: string[];
   limit?: number;
+  embeddingModel?: string;
 }): Promise<ChapterContext> {
   const [bibleRecord] = await db
     .select()
     .from(storyBibles)
     .where(eq(storyBibles.storyId, params.storyId))
     .limit(1);
+
+  const [foundationRecord] = await db
+    .select()
+    .from(storyFoundations)
+    .where(eq(storyFoundations.storyId, params.storyId))
+    .limit(1);
+
+  const parsedFoundation = foundationRecord?.foundation
+    ? storyFoundationSchema.parse(foundationRecord.foundation)
+    : null;
 
   const memories = await db
     .select()
@@ -45,11 +59,15 @@ export async function buildContextForChapter(params: {
     characters: params.characters,
     categories: params.categories,
     limit: params.limit ?? 12,
+    embeddingModel: params.embeddingModel ?? env.openRouterEmbeddingModel,
     fallbackCategories: params.categories?.length ? params.categories : ["canon_fact", "character_state", "open_thread", "continuity_warning"]
   });
 
   return {
     storyBible: bibleRecord?.bible ? storyBibleSchema.parse(bibleRecord.bible) : null,
+    storyFoundationContext: parsedFoundation
+      ? buildStoryFoundationContext(parsedFoundation, foundationRecord.status)
+      : null,
     previousLongSummary: getSummary(previous?.memory, "longSummary"),
     recentMediumSummaries: recent.map((record) => ({
       chapterNumber: record.chapterNumber,
@@ -84,6 +102,7 @@ async function findRelevantMemoryItems(params: {
   characters?: string[];
   categories?: string[];
   limit: number;
+  embeddingModel: string;
   fallbackCategories: string[];
 }) {
   const categoryFilter = params.categories?.filter((category) =>
@@ -97,7 +116,7 @@ async function findRelevantMemoryItems(params: {
   ].filter(Boolean);
 
   if (params.query) {
-    const [embedding] = await createEmbeddings([params.query]);
+    const [embedding] = await createEmbeddingsWithModel([params.query], params.embeddingModel);
     if (embedding) {
       const rows = await db
         .select({

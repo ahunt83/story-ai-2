@@ -47,6 +47,13 @@ export function ContinuityContextPanel({
 
       <SectionHeading icon={<Brain size={16} />} title="Continuity Context" />
       {error ? <p className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{error}</p> : null}
+      {context.storyFoundationContext ? (
+        <div className="mb-4 rounded-md border border-intelligence-teal/30 bg-white p-4">
+          <p className="mb-2 text-xs font-bold uppercase text-intelligence-teal">Story Foundation / {context.storyFoundationContext.status}</p>
+          <p className="text-sm font-bold text-primary">{context.storyFoundationContext.premise}</p>
+          <p className="mt-2 line-clamp-4 text-sm leading-6 text-on-surface-variant">{context.storyFoundationContext.readerPromise}</p>
+        </div>
+      ) : null}
       <div className="space-y-3">
         {context.relevantMemoryItems.length > 0 ? context.relevantMemoryItems.map((item) => (
           <MemoryCard
