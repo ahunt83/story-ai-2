@@ -28,6 +28,21 @@ type StoryResponse = {
 };
 
 type SaveStatus = "saved" | "saving" | "unsaved" | "failed";
+type StreamUsage = { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+type StreamEvent =
+  | { type: "context"; context: unknown }
+  | { type: "delta"; content: string }
+  | { type: "complete"; draft: string; context?: unknown; usage?: StreamUsage; generationId?: string; fallbackUsed?: boolean }
+  | { type: "error"; error: string };
+type RevisionPreviewState = {
+  originalText: string;
+  draft: string;
+  command: string;
+  complete: boolean;
+  usage?: StreamUsage;
+  generationId?: string;
+  fallbackUsed?: boolean;
+};
 
 export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "draft" | "cowriter" }) {
   const router = useRouter();
@@ -43,6 +58,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   const [actionResult, setActionResult] = useState<string | undefined>();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [revisionPreview, setRevisionPreview] = useState<RevisionPreviewState | null>(null);
 
   useEffect(() => {
     async function resolveAndLoad() {
@@ -117,11 +133,16 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
 
   function updateDraft(value: string) {
     if (!activeSceneId) return;
+    setActiveSceneDraft(value);
+    setSaveStatus("unsaved");
+  }
+
+  function setActiveSceneDraft(value: string) {
+    if (!activeSceneId) return;
     setBundle((current) => current ? {
       ...current,
       scenes: current.scenes.map((scene) => scene.id === activeSceneId ? { ...scene, draftText: value } : scene)
     } : current);
-    setSaveStatus("unsaved");
   }
 
   async function reloadCurrentChapter(message?: string) {
@@ -132,24 +153,37 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
 
   async function generate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!chapterId || !activeSceneId) {
+    if (!chapterId || !activeSceneId || !activeScene) {
       setError("Create a live story and select a scene before generation.");
       return;
     }
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const direction = String(form.get("direction") ?? "");
+    const originalText = activeScene.draftText;
+    let streamedDraft = "";
     setBusy("generate");
+    setSaveStatus("saving");
     setError(null);
+    setRevisionPreview(null);
 
     try {
-      await apiFetch(`/api/chapters/${chapterId}/generate`, {
-        method: "POST",
-        body: JSON.stringify({ direction, sceneId: activeSceneId })
+      await streamAiText(`/api/chapters/${chapterId}/generate`, { direction, sceneId: activeSceneId }, (streamEvent) => {
+        if (streamEvent.type === "delta") {
+          streamedDraft += streamEvent.content;
+          setActiveSceneDraft(streamedDraft);
+        }
+
+        if (streamEvent.type === "complete") {
+          setActiveSceneDraft(streamEvent.draft);
+        }
       });
       await reloadCurrentChapter("Draft generated and saved to the selected scene.");
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (err) {
+      setActiveSceneDraft(originalText);
+      setSaveStatus("saved");
       setError(err instanceof Error ? err.message : "Could not generate draft");
     } finally {
       setBusy(null);
@@ -158,28 +192,80 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
 
   async function revise(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!chapterId || !activeSceneId) {
+    if (!chapterId || !activeSceneId || !activeScene) {
       setError("Create a live story and select a scene before revisions.");
       return;
     }
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const command = String(form.get("command") ?? "");
+    const originalText = activeScene.draftText;
+    let streamedDraft = "";
     setBusy("revise");
     setError(null);
+    setRevisionPreview({ originalText, draft: "", command, complete: false });
 
     try {
-      await apiFetch(`/api/chapters/${chapterId}/revise`, {
-        method: "POST",
-        body: JSON.stringify({ command, sceneId: activeSceneId })
+      await streamAiText(`/api/chapters/${chapterId}/revise`, { command, sceneId: activeSceneId }, (streamEvent) => {
+        if (streamEvent.type === "delta") {
+          streamedDraft += streamEvent.content;
+          setRevisionPreview((current) => current ? { ...current, draft: streamedDraft } : current);
+        }
+
+        if (streamEvent.type === "complete") {
+          setRevisionPreview((current) => current ? {
+            ...current,
+            draft: streamEvent.draft,
+            complete: true,
+            usage: streamEvent.usage,
+            generationId: streamEvent.generationId,
+            fallbackUsed: streamEvent.fallbackUsed
+          } : current);
+        }
       });
-      await reloadCurrentChapter("Revision applied and previous draft saved to version history.");
-      event.currentTarget.reset();
+      setActionResult("Revision preview ready. Accept or reject the changes.");
+      formElement.reset();
     } catch (err) {
+      setRevisionPreview(null);
+      setActiveSceneDraft(originalText);
       setError(err instanceof Error ? err.message : "Could not revise draft");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function acceptRevisionPreview() {
+    if (!chapterId || !activeSceneId || !revisionPreview?.complete) return;
+
+    setBusy("apply-revision");
+    setError(null);
+
+    try {
+      await apiFetch(`/api/chapters/${chapterId}/apply-revision`, {
+        method: "POST",
+        body: JSON.stringify({
+          sceneId: activeSceneId,
+          command: revisionPreview.command,
+          draft: revisionPreview.draft,
+          usage: revisionPreview.usage,
+          generationId: revisionPreview.generationId,
+          fallbackUsed: revisionPreview.fallbackUsed
+        })
+      });
+      setActiveSceneDraft(revisionPreview.draft);
+      setRevisionPreview(null);
+      await reloadCurrentChapter("Revision accepted and previous draft saved to version history.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not accept revision");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function rejectRevisionPreview() {
+    setRevisionPreview(null);
+    setActionResult("Revision rejected. Original draft kept.");
   }
 
   async function runAssistantAction(kind: "memory-check" | "suggest-next-beat") {
@@ -282,6 +368,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   const action = chapterId
     ? <Link href={`/writing/extraction?chapterId=${chapterId}`} className="hidden rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 sm:inline-flex">Extract Memory</Link>
     : <Link href="/" className="hidden rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 sm:inline-flex">Create Story</Link>;
+  const draftLocked = busy === "generate" || busy === "revise" || busy === "apply-revision" || Boolean(revisionPreview);
 
   return (
     <AppShell
@@ -308,10 +395,14 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
             currentChapterId={chapterId}
             activeSceneId={activeSceneId}
             onChapter={(id) => {
+              setRevisionPreview(null);
               setChapterId(id);
               router.push(`/writing?chapterId=${id}`);
             }}
-            onScene={setActiveSceneId}
+            onScene={(id) => {
+              setRevisionPreview(null);
+              setActiveSceneId(id);
+            }}
             onNewChapter={createNextChapter}
             onNewScene={createScene}
             busy={busy}
@@ -326,10 +417,16 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
             <WritingCanvas
               mode={initialMode}
               title={title}
-              text={displayedText}
-              editable={Boolean(bundle && activeScene)}
+              text={revisionPreview ? revisionPreview.draft : displayedText}
+              editable={Boolean(bundle && activeScene) && !draftLocked}
               onChange={updateDraft}
-              saveStatus={saveStatus}
+              saveStatus={busy === "generate" ? "saving" : saveStatus}
+              revisionPreview={revisionPreview ? {
+                streaming: !revisionPreview.complete || busy === "revise",
+                applying: busy === "apply-revision",
+                onAccept: acceptRevisionPreview,
+                onReject: rejectRevisionPreview
+              } : undefined}
             />
           )}
           <div className="border-t border-outline-variant bg-white p-4 lg:hidden">
@@ -355,6 +452,58 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
       </div>
     </AppShell>
   );
+}
+
+async function streamAiText(url: string, body: Record<string, unknown>, onEvent: (event: StreamEvent) => void) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/x-ndjson",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(typeof data.error === "string" ? data.error : "Request failed");
+  }
+
+  if (!response.body) {
+    throw new Error("The AI stream could not be opened.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    let lineBreak = buffer.indexOf("\n");
+
+    while (lineBreak >= 0) {
+      const line = buffer.slice(0, lineBreak).trim();
+      buffer = buffer.slice(lineBreak + 1);
+      if (line) handleStreamLine(line, onEvent);
+      lineBreak = buffer.indexOf("\n");
+    }
+  }
+
+  const finalLine = buffer.trim();
+  if (finalLine) {
+    handleStreamLine(finalLine, onEvent);
+  }
+}
+
+function handleStreamLine(line: string, onEvent: (event: StreamEvent) => void) {
+  const event = JSON.parse(line) as StreamEvent;
+  if (event.type === "error") {
+    throw new Error(event.error);
+  }
+  onEvent(event);
 }
 
 function Navigator({

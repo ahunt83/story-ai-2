@@ -10,7 +10,8 @@ export function WritingCanvas({
   text,
   editable = false,
   onChange,
-  saveStatus
+  saveStatus,
+  revisionPreview
 }: {
   mode?: "draft" | "cowriter" | "readonly";
   title?: string;
@@ -18,8 +19,14 @@ export function WritingCanvas({
   editable?: boolean;
   onChange?: (value: string) => void;
   saveStatus?: "saved" | "saving" | "unsaved" | "failed";
+  revisionPreview?: {
+    streaming: boolean;
+    applying?: boolean;
+    onAccept: () => void;
+    onReject: () => void;
+  };
 }) {
-  const displayText = text?.trim() ? text : sampleChapterText;
+  const displayText = revisionPreview ? (text ?? "") : text?.trim() ? text : sampleChapterText;
   const displayTitle = title ?? (mode === "cowriter" ? "Collaborative Draft: Chapter 4" : "Chapter 4: The Shattered Mirror");
   const wordCount = displayText.trim().split(/\s+/).filter(Boolean).length;
   const readingTime = Math.max(1, Math.ceil(wordCount / 260));
@@ -35,13 +42,19 @@ export function WritingCanvas({
         <h2 className="headline-serif mb-8 border-b border-memory-border pb-5 text-3xl italic text-primary md:text-[40px]">
           {displayTitle}
         </h2>
-        {editable ? (
+        {revisionPreview ? (
+          <RevisionPreviewProse text={displayText} streaming={revisionPreview.streaming} />
+        ) : editable ? (
           <EditableProse text={displayText} onChange={onChange} saveStatus={saveStatus} />
         ) : mode === "cowriter" && !text ? <CoWriterProse /> : <Prose text={displayText} />}
-        {mode === "cowriter" ? (
+        {mode === "cowriter" && revisionPreview ? (
           <div className="sticky bottom-6 mt-16 flex justify-center gap-3">
-            <Button variant="teal" className="rounded-full shadow-lg"><CheckCircle size={17} />Accept All</Button>
-            <Button variant="secondary" className="rounded-full shadow-lg"><XCircle size={17} />Reject All</Button>
+            <Button variant="teal" className="rounded-full shadow-lg" onClick={revisionPreview.onAccept} disabled={revisionPreview.streaming || revisionPreview.applying}>
+              <CheckCircle size={17} />{revisionPreview.applying ? "Accepting..." : "Accept All"}
+            </Button>
+            <Button variant="secondary" className="rounded-full shadow-lg" onClick={revisionPreview.onReject} disabled={revisionPreview.applying}>
+              <XCircle size={17} />Reject All
+            </Button>
           </div>
         ) : null}
       </article>
@@ -88,6 +101,19 @@ function Prose({ text }: { text: string }) {
   return (
     <div className="story-prose whitespace-pre-line text-on-surface">
       {text}
+    </div>
+  );
+}
+
+function RevisionPreviewProse({ text, streaming }: { text: string; streaming: boolean }) {
+  return (
+    <div>
+      <p className="ui-label mb-6 text-intelligence-teal">
+        {streaming ? "AI revision in progress..." : "AI revision preview ready"}
+      </p>
+      <div className="story-prose whitespace-pre-line rounded-md border border-intelligence-teal/40 bg-white/55 p-4 text-on-surface">
+        {text}
+      </div>
     </div>
   );
 }

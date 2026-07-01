@@ -177,7 +177,9 @@ Production behavior:
 - OpenRouter auth, insufficient credits, rate limits, and structured-output support errors are mapped to user-facing messages.
 - Generation/revision store returned token usage in `ai_messages.metadata` when available.
 - Failed generation/revision attempts are stored in `ai_messages.metadata` with `status: "failed"`.
-- Streaming generation is not implemented yet; keep extraction non-streaming because structured JSON validation is simpler.
+- Generation streams directly into the active scene and persists only after the stream completes.
+- Revision streams into a preview; accepting the preview persists it and stores the previous draft version.
+- Keep extraction non-streaming because structured JSON validation is simpler.
 
 ## Validation And Repair
 

@@ -53,9 +53,12 @@ Defined in `src/db/schema.ts`.
 - `story_bibles`: compact current canonical Story Bible JSONB per story.
 - `memory_items`: normalized searchable memory rows with category, importance, persistence, evidence, payload JSONB, and pgvector embedding.
 
-Important current limitation:
+Streaming behavior:
 
-- Streaming generation is still a future production-hardening step. Generation/revision currently show progress states and store usage/error metadata when OpenRouter returns it.
+- Generation and revision support streamed `application/x-ndjson` responses when the client sends `Accept: application/x-ndjson`.
+- Generation streams directly into the active scene and saves when the full response completes.
+- Revision streams into a preview; `POST /api/chapters/:chapterId/apply-revision` saves the accepted preview, preserves the previous draft version, and logs usage metadata.
+- Failed streaming attempts preserve failed-call metadata in `ai_messages`.
 
 ## API Routes
 
@@ -72,6 +75,7 @@ Chapter routes:
 - `GET /api/chapters/:chapterId`
 - `POST /api/chapters/:chapterId/generate`
 - `POST /api/chapters/:chapterId/revise`
+- `POST /api/chapters/:chapterId/apply-revision`
 - `POST /api/chapters/:chapterId/memory-check`
 - `POST /api/chapters/:chapterId/suggest-next-beat`
 - `POST /api/chapters/:chapterId/extract-memory`

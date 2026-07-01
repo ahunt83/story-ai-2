@@ -37,7 +37,7 @@ Current intended scope:
 - Docker Postgres is the database.
 - OpenRouter is the AI provider.
 - Chapters can contain scenes, but memory extraction commits at chapter level.
-- AI revisions replace the active draft while preserving prior versions.
+- AI revisions stream into a reviewable preview; accepting replaces the active draft while preserving prior versions.
 - Embeddings are included from the start through pgvector.
 
 ## Current Product State
@@ -47,7 +47,7 @@ Live flows currently implemented:
 - Library loads real local stories.
 - New Story modal creates story, Chapter 1, Opening Scene, and Story Bible.
 - Writing screen generates a draft into the active chapter.
-- Co-writer screen revises the active draft and saves previous draft versions.
+- Co-writer screen streams revision previews and saves previous draft versions when changes are accepted.
 - Memory Check and Suggest Next Beat use context-aware backend routes.
 - Extraction screen runs memory extraction and commits memory to the Story Bible.
 

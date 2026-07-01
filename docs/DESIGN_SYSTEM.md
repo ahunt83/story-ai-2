@@ -137,7 +137,7 @@ AI Co-writer:
 
 - Shows revision chat/control surface.
 - AI changes should feel reviewable.
-- Current behavior replaces draft and stores previous version.
+- Current behavior streams edits into a preview; accepting replaces the draft and stores the previous version.
 
 Memory Approval:
 

@@ -27,6 +27,8 @@ test.describe("live workflow", () => {
     await expect(page).toHaveURL(/\/writing\/co-writer\?chapterId=/);
     await page.locator("aside").getByPlaceholder("Make the last paragraph more tense and clarify Elena's voice.").fill("Make the discovery feel more deliberate and ominous.");
     await page.locator("aside").getByRole("button", { name: "Apply Revision" }).click();
+    await expect(page.getByText(/Revision note applied locally/)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Accept All" }).click();
     await expect(page.getByLabel("Scene draft text")).toHaveValue(/Revision note applied locally/, { timeout: 15_000 });
 
     await page.getByRole("link", { name: "Extract Memory" }).click();

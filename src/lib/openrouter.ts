@@ -18,6 +18,11 @@ export type OpenRouterUsage = {
   total_tokens?: number;
 };
 
+export type OpenRouterTextStreamEvent =
+  | { type: "metadata"; generationId?: string }
+  | { type: "delta"; content: string }
+  | { type: "usage"; usage: OpenRouterUsage };
+
 export class OpenRouterRequestError extends Error {
   status: number;
   providerMessage: string;
@@ -30,20 +35,37 @@ export class OpenRouterRequestError extends Error {
   }
 }
 
-async function openRouterFetch(path: string, body: Record<string, unknown>) {
+export class OpenRouterStreamError extends Error {
+  code?: string | number;
+  providerMessage: string;
+
+  constructor(providerMessage: string, code?: string | number) {
+    super(`OpenRouter stream failed. ${providerMessage}`);
+    this.name = "OpenRouterStreamError";
+    this.providerMessage = providerMessage;
+    this.code = code;
+  }
+}
+
+function openRouterHeaders() {
+  return {
+    Authorization: `Bearer ${env.openRouterApiKey}`,
+    "Content-Type": "application/json",
+    "HTTP-Referer": "http://localhost:3000",
+    "X-Title": "Codex Story AI"
+  };
+}
+
+async function openRouterFetch(path: string, body: Record<string, unknown>, signal?: AbortSignal) {
   if (!env.openRouterApiKey) {
     throw new Error("OPENROUTER_API_KEY is not configured");
   }
 
   const response = await fetch(`https://openrouter.ai/api/v1${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.openRouterApiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:3000",
-      "X-Title": "Codex Story AI"
-    },
-    body: JSON.stringify(body)
+    headers: openRouterHeaders(),
+    body: JSON.stringify(body),
+    signal
   });
 
   if (!response.ok) {
@@ -120,6 +142,132 @@ export async function completeTextWithMetadata(params: {
     usage: usageFrom(json),
     fallbackUsed: !choices?.[0]?.message?.content
   };
+}
+
+export async function* streamTextWithMetadata(params: {
+  model?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  fallback: string;
+  signal?: AbortSignal;
+}): AsyncGenerator<OpenRouterTextStreamEvent> {
+  if (!env.openRouterApiKey) {
+    for (const chunk of chunkFallback(params.fallback)) {
+      yield { type: "delta", content: chunk };
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    return;
+  }
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: openRouterHeaders(),
+    body: JSON.stringify({
+      model: params.model ?? env.openRouterChatModel,
+      messages: params.messages,
+      temperature: params.temperature ?? 0.8,
+      max_tokens: params.maxTokens ?? 1800,
+      stream: true,
+      stream_options: { include_usage: true }
+    }),
+    signal: params.signal
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new OpenRouterRequestError(response.status, text);
+  }
+
+  const generationId = response.headers.get("X-Generation-Id") ?? undefined;
+  if (generationId) {
+    yield { type: "metadata", generationId };
+  }
+
+  if (!response.body) {
+    throw new Error("OpenRouter returned an empty stream.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const events = takeSseEvents(buffer);
+    buffer = events.remainder;
+
+    for (const event of events.blocks) {
+      const data = sseData(event);
+      if (!data || data === "[DONE]") continue;
+
+      const parsed = JSON.parse(data) as {
+        choices?: Array<{ delta?: { content?: string }; finish_reason?: string }>;
+        error?: { message?: string; code?: string | number };
+        usage?: OpenRouterUsage;
+      };
+
+      if (parsed.error) {
+        throw new OpenRouterStreamError(parsed.error.message ?? "The provider ended the stream with an error.", parsed.error.code);
+      }
+
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (content) {
+        yield { type: "delta", content };
+      }
+
+      if (parsed.usage) {
+        yield { type: "usage", usage: parsed.usage };
+      }
+    }
+  }
+
+  const finalData = sseData(buffer);
+  if (finalData && finalData !== "[DONE]") {
+    const parsed = JSON.parse(finalData) as { choices?: Array<{ delta?: { content?: string } }>; usage?: OpenRouterUsage };
+    const content = parsed.choices?.[0]?.delta?.content;
+    if (content) yield { type: "delta", content };
+    if (parsed.usage) yield { type: "usage", usage: parsed.usage };
+  }
+}
+
+function takeSseEvents(buffer: string) {
+  const blocks: string[] = [];
+  let remainder = buffer;
+  let boundary = remainder.indexOf("\n\n");
+
+  while (boundary >= 0) {
+    blocks.push(remainder.slice(0, boundary));
+    remainder = remainder.slice(boundary + 2);
+    boundary = remainder.indexOf("\n\n");
+  }
+
+  return { blocks, remainder };
+}
+
+function sseData(block: string) {
+  return block
+    .split("\n")
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n")
+    .trim();
+}
+
+function chunkFallback(text: string) {
+  const chunks: string[] = [];
+  let cursor = 0;
+  const size = 80;
+
+  while (cursor < text.length) {
+    chunks.push(text.slice(cursor, cursor + size));
+    cursor += size;
+  }
+
+  return chunks;
 }
 
 export async function completeJson<T>(params: {

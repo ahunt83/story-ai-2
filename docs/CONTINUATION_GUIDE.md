@@ -29,7 +29,7 @@ Built and verified:
 - Deterministic local AI fallbacks when `OPENROUTER_API_KEY` is empty.
 - Library screen with live story loading and story creation modal.
 - Writing screen with chapter/scene navigation, editable manuscript canvas, autosave, live draft generation, and manual snapshots.
-- Co-writer screen with selected-scene revision and draft version history restore.
+- Co-writer screen with streamed selected-scene revision previews, accept/reject review, and draft version history restore.
 - Memory Check and Suggest Next Beat API actions.
 - Memory extraction approval screen that can run extraction, edit/toggle/validate memory, and commit approved memory.
 - Story Bible screen reads live `story_bibles` and normalized `memory_items` with tabs/search/filtering.
@@ -113,6 +113,6 @@ The strongest non-production next slice is responsive and UX polish:
 2. Broaden loading/empty/error states across Library, Writing, Extraction, and Story Bible.
 3. Add optional API-level integration tests for direct database assertions around extract/commit.
 
-Production hardening remains tracked separately in `TODO.md`, including streaming generation/revision and deployment/auth/cost-control work.
+Production hardening remains tracked separately in `TODO.md`, including deployment/auth/cost-control work.
 
 See `TODO.md` for detailed implementation steps and acceptance criteria.

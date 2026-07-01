@@ -4,8 +4,7 @@ This file tracks the remaining work after the initial MVP scaffold and live work
 
 Status after the current build pass:
 
-- Completed: items 1, 2, 3, 4, 5, 6, 8, and 9.
-- Partially completed: item 7. OpenRouter errors, usage metadata, failed-call metadata, model display, and extraction structured-output guidance are implemented; true streaming generation/revision remains.
+- Completed: items 1, 2, 3, 4, 5, 6, 7, 8, and 9.
 - Partially completed: item 10. Sidebar navigation preserves live `chapterId`/`storyId` context, and Story Bible can resolve a story from `chapterId`; mobile drawers/sheets and broader polish remain.
 - Still open: item 10 UX/responsive refinement and item 11 later production work.
 
@@ -14,7 +13,7 @@ Recommended build order:
 - [x] Make Story Bible and Memory Approval fully live.
 - [x] Add a real manuscript editor with autosave and version rollback.
 - [x] Add chapter/scene navigation and next-chapter workflow.
-- [ ] Finish OpenRouter production behavior by adding true streaming generation/revision.
+- [x] Finish OpenRouter production behavior by adding true streaming generation/revision.
 - [x] Expand workflow tests with an isolated test database and full happy-path coverage.
 - [x] Prepare database migrations and setup hygiene.
 
@@ -207,9 +206,9 @@ Implementation details:
   - [x] Memory Check uses the same context package shown in UI.
   - [x] Critical facts are never dropped just because semantic score is low.
 
-## 7. OpenRouter Production Behavior — Partially Completed
+## 7. OpenRouter Production Behavior — Completed
 
-Status: Partially completed. Error handling, failed-call metadata, usage metadata, settings display, and structured-output guidance are implemented. True streaming generation/revision remains open.
+Status: Completed. Error handling, failed-call metadata, usage metadata, settings display, structured-output guidance, and true streaming generation/revision are implemented.
 
 Goal: Make AI calls robust enough for real use.
 
@@ -220,7 +219,7 @@ Implementation details:
   - Allow editing local model settings in UI if storing settings in DB.
   - Otherwise document `.env.local` clearly.
 - Streaming:
-  - [ ] Add streaming for generation/revision.
+  - [x] Add streaming for generation/revision.
   - [x] Keep extraction non-streaming because structured JSON is simpler to validate.
 - Error handling:
   - Surface auth, insufficient credits, unsupported structured output, and rate limits clearly.
@@ -234,7 +233,7 @@ Implementation details:
   - If selected model fails `response_format`, show actionable error and suggest another model.
 - Acceptance criteria:
   - [x] User sees useful error when API key is missing/invalid.
-  - [ ] Long generation streams progress instead of waiting for one final response.
+  - [x] Long generation streams progress instead of waiting for one final response.
   - [x] Extraction failures preserve raw response and validation error.
 
 ## 8. Database Migrations And Hygiene — Completed
