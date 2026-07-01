@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { ThemeSettings } from "@/components/theme-settings";
 import { MemoryCard } from "@/components/ui";
 import { env } from "@/lib/env";
 
@@ -18,6 +19,12 @@ export default function SettingsPage() {
       <AppShell title="Settings">
         <div className="mx-auto max-w-3xl px-5 py-10 md:px-8">
           <h2 className="headline-serif mb-6 text-3xl text-primary">Local MVP Settings</h2>
+          <div className="mb-5">
+            <MemoryCard title="Appearance">
+              <p className="mb-4">Choose how Codex looks for your user profile. The preference is saved locally in Postgres and applied across the app.</p>
+              <ThemeSettings />
+            </MemoryCard>
+          </div>
           <MemoryCard title="OpenRouter">
             <p className="mb-4">Configure `OPENROUTER_API_KEY` and model names in `.env.local`. Without a key, API routes use deterministic local fallbacks for development.</p>
             <div className="divide-y divide-outline-variant rounded-md border border-outline-variant">

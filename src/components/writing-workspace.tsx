@@ -367,8 +367,8 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   }
 
   const action = chapterId
-    ? <Link href={`/writing/extraction?chapterId=${chapterId}`} className="hidden rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 sm:inline-flex">Extract Memory</Link>
-    : <Link href="/" className="hidden rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 sm:inline-flex">Create Story</Link>;
+    ? <Link href={`/writing/extraction?chapterId=${chapterId}`} className="hidden rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105 sm:inline-flex">Extract Memory</Link>
+    : <Link href="/" className="hidden rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105 sm:inline-flex">Create Story</Link>;
   const draftLocked = busy === "generate" || busy === "revise" || busy === "apply-revision" || Boolean(revisionPreview);
   const hasLiveChapter = Boolean(bundle && chapterId);
 
@@ -491,7 +491,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
         </div>
         <LiveControls busy={busy} generate={generate} revise={revise} coWriter={initialMode === "cowriter"} />
         {chapterId ? (
-          <Link href={`/writing/extraction?chapterId=${chapterId}`} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-bold text-on-primary transition hover:opacity-90">
+          <Link href={`/writing/extraction?chapterId=${chapterId}`} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-intelligence-teal px-4 py-3 text-sm font-bold text-on-primary transition hover:brightness-105">
             <BookOpen size={16} />
             Extract Memory
           </Link>
@@ -528,7 +528,7 @@ function EmptyWritingState() {
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-on-surface-variant">
           Choose a story from the library or start a new one before using the editor, generation tools, and memory workflow.
         </p>
-        <Link href="/" className="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">
+        <Link href="/" className="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105">
           <BookOpen size={16} />
           Go to Library
         </Link>

@@ -12,10 +12,10 @@ export function Button({
   variant?: "primary" | "secondary" | "ghost" | "teal";
 }) {
   const classes = {
-    primary: "bg-primary text-on-primary hover:opacity-90",
-    secondary: "border border-outline-variant bg-white text-on-surface hover:bg-surface-container-low",
+    primary: "bg-intelligence-teal text-on-primary hover:brightness-105",
+    secondary: "border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low",
     ghost: "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
-    teal: "bg-intelligence-teal text-white hover:brightness-105"
+    teal: "bg-intelligence-teal text-on-primary hover:brightness-105"
   };
 
   return (
@@ -42,7 +42,7 @@ export function MemoryCard({
   className?: string;
 }) {
   return (
-    <article className={cn("rounded-md border border-memory-border bg-white p-4 transition hover:border-intelligence-teal/50", className)}>
+    <article className={cn("rounded-md border border-memory-border bg-surface-container-lowest p-4 transition hover:border-intelligence-teal/50", className)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <h3 className="text-sm font-bold text-primary">{title}</h3>
         {importance ? <ImportancePill importance={importance} /> : null}
@@ -55,8 +55,8 @@ export function MemoryCard({
 
 export function ImportancePill({ importance }: { importance: Importance }) {
   const classes = {
-    critical: "bg-intelligence-teal text-white border-intelligence-teal",
-    major: "border-intelligence-teal text-intelligence-teal bg-white",
+    critical: "bg-intelligence-teal text-on-primary border-intelligence-teal",
+    major: "border-intelligence-teal text-intelligence-teal bg-surface-container-lowest",
     minor: "border-outline-variant text-on-surface-variant bg-surface-container-low"
   };
 

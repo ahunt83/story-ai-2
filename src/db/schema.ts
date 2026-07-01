@@ -48,6 +48,12 @@ export const stories = pgTable("stories", {
   ...timestamps
 });
 
+export const userPreferences = pgTable("user_preferences", {
+  userId: text("user_id").primaryKey(),
+  themePreference: text("theme_preference").notNull().default("light"),
+  ...timestamps
+});
+
 export const chapters = pgTable("chapters", {
   id: text("id").primaryKey(),
   storyId: text("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
