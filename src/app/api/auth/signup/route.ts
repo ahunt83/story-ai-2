@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { stories, users } from "@/db/schema";
-import { fail, ok } from "@/lib/api";
-import { createSession, getUserCount, hashPassword, setSessionCookie } from "@/lib/auth";
+import { ConflictError, fail, ok } from "@/lib/api";
+import { createSession, ForbiddenError, getUserCount, hashPassword, setSessionCookie } from "@/lib/auth";
 import { createId } from "@/lib/ids";
 
 const signupSchema = z.object({
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     if (existingUserCount > 0) {
       const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1);
       if (!existing) {
-        throw new Error("Signup is closed after the first local user is created.");
+        throw new ForbiddenError("Signup is closed after the first local user is created.");
       }
     }
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       .returning();
 
     if (!created) {
-      throw new Error("An account with that email already exists.");
+      throw new ConflictError("An account with that email already exists.");
     }
 
     if (existingUserCount === 0) {

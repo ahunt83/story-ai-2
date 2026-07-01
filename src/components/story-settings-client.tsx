@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity, Save } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { Button, MemoryCard } from "@/components/ui";
 import { apiFetch } from "@/lib/client-api";
@@ -36,6 +36,7 @@ export function StorySettingsClient() {
   const [runs, setRuns] = useState<AiRun[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     apiFetch<{ stories: StoryRow[] }>("/api/stories")
@@ -48,16 +49,28 @@ export function StorySettingsClient() {
 
   useEffect(() => {
     if (!storyId) return;
+    const requestId = ++requestIdRef.current;
+    setSettings(null);
+    setRuns([]);
     setStatus(null);
+    setError(null);
     Promise.all([
       apiFetch<{ settings: StoryModelSettings }>(`/api/stories/${storyId}/model-settings`),
       apiFetch<{ runs: AiRun[] }>(`/api/stories/${storyId}/ai-runs`)
     ])
       .then(([settingsResponse, runsResponse]) => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
         setSettings(settingsResponse.settings);
         setRuns(runsResponse.runs);
       })
-      .catch((err: Error) => setError(err.message));
+      .catch((err: Error) => {
+        if (requestId === requestIdRef.current) {
+          setError(err.message);
+        }
+      });
   }, [storyId]);
 
   const selectedStory = useMemo(() => stories.find((story) => story.id === storyId), [stories, storyId]);
@@ -104,7 +117,7 @@ export function StorySettingsClient() {
         ) : <p>No stories yet.</p>}
 
         {settings ? (
-          <form onSubmit={save} className="grid gap-3">
+          <form key={storyId} onSubmit={save} className="grid gap-3">
             <Field name="chatModel" label="Generation Model" defaultValue={settings.chatModel} />
             <Field name="revisionModel" label="Revision Model" defaultValue={settings.revisionModel} />
             <Field name="extractionModel" label="Extraction Model" defaultValue={settings.extractionModel} />

@@ -9,6 +9,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   vector
 } from "drizzle-orm/pg-core";
 
@@ -98,7 +99,8 @@ export const chapters = pgTable("chapters", {
   status: chapterStatusEnum("status").notNull().default("draft"),
   ...timestamps
 }, (table) => ({
-  storyChapterIdx: index("chapters_story_chapter_idx").on(table.storyId, table.chapterNumber)
+  storyChapterIdx: index("chapters_story_chapter_idx").on(table.storyId, table.chapterNumber),
+  storyChapterUnique: uniqueIndex("chapters_story_chapter_unique").on(table.storyId, table.chapterNumber)
 }));
 
 export const scenes = pgTable("scenes", {
@@ -110,7 +112,8 @@ export const scenes = pgTable("scenes", {
   approvedText: text("approved_text"),
   ...timestamps
 }, (table) => ({
-  chapterOrderIdx: index("scenes_chapter_order_idx").on(table.chapterId, table.orderIndex)
+  chapterOrderIdx: index("scenes_chapter_order_idx").on(table.chapterId, table.orderIndex),
+  chapterOrderUnique: uniqueIndex("scenes_chapter_order_unique").on(table.chapterId, table.orderIndex)
 }));
 
 export const draftVersions = pgTable("draft_versions", {

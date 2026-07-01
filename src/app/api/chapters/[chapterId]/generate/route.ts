@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createId } from "@/lib/ids";
 import { OpenRouterRequestError, OpenRouterStreamError, type OpenRouterUsage } from "@/lib/openrouter";
+import { NotFoundError } from "@/lib/ownership";
 import { generateDraftRun, streamGenerateDraftRun } from "@/lib/story-memory/ai";
 import { buildContextForChapter } from "@/lib/story-memory/context";
 import { createMockContext } from "@/lib/story-memory/mock";
@@ -31,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       : bundle.scenes[0];
 
     if (!targetScene) {
-      throw new Error("Scene not found");
+      throw new NotFoundError("Scene not found");
     }
 
     const modelSettings = await resolveStoryModelSettings(bundle.story.id);

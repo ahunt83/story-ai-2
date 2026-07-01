@@ -2,6 +2,7 @@ import { and, eq, isNull, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { chapters, scenes, stories } from "@/db/schema";
+import { getUserCount } from "@/lib/auth";
 import { ensureUserPreferences } from "@/lib/user-preferences";
 
 export class NotFoundError extends Error {
@@ -12,10 +13,14 @@ export class NotFoundError extends Error {
 }
 
 export async function requireOwnedStory(storyId: string, userId: string) {
+  const allowUnownedClaim = await canClaimUnownedStories();
   const [story] = await db
     .select()
     .from(stories)
-    .where(and(eq(stories.id, storyId), or(eq(stories.ownerUserId, userId), isNull(stories.ownerUserId))))
+    .where(and(
+      eq(stories.id, storyId),
+      allowUnownedClaim ? or(eq(stories.ownerUserId, userId), isNull(stories.ownerUserId)) : eq(stories.ownerUserId, userId)
+    ))
     .limit(1);
 
   if (!story) {
@@ -39,6 +44,10 @@ export async function requireOwnedStory(storyId: string, userId: string) {
   }
 
   return story;
+}
+
+export async function canClaimUnownedStories() {
+  return (await getUserCount()) <= 1;
 }
 
 export async function requireOwnedChapter(chapterId: string, userId: string) {
