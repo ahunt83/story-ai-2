@@ -81,6 +81,12 @@ export const stories = pgTable("stories", {
   ...timestamps
 });
 
+export const userPreferences = pgTable("user_preferences", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  themePreference: text("theme_preference").notNull().default("light"),
+  ...timestamps
+});
+
 export const chapters = pgTable("chapters", {
   id: text("id").primaryKey(),
   storyId: text("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
@@ -220,10 +226,15 @@ export const aiRuns = pgTable("ai_runs", {
   operationIdx: index("ai_runs_operation_idx").on(table.operation)
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   stories: many(stories),
   sessions: many(sessions),
-  aiRuns: many(aiRuns)
+  aiRuns: many(aiRuns),
+  preferences: one(userPreferences)
+}));
+
+export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
+  user: one(users, { fields: [userPreferences.userId], references: [users.id] })
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({

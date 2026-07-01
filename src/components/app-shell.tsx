@@ -114,10 +114,10 @@ function SideNav({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
     <aside className="flex h-full w-sidebar flex-col bg-primary-container px-6 py-8 text-on-primary-container">
       <div className="mb-12 flex items-start justify-between">
         <div>
-          <Link href="/" className="display-title block leading-none text-parchment-base">Codex</Link>
+          <Link href="/" className="display-title block leading-none text-intelligence-teal">Codex</Link>
           <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-on-primary-container">Creative Professional</p>
         </div>
-        <button className="rounded-md p-2 text-parchment-base lg:hidden" onClick={onClose} aria-label="Close navigation">
+        <button className="rounded-md p-2 text-intelligence-teal lg:hidden" onClick={onClose} aria-label="Close navigation">
           <X size={20} />
         </button>
       </div>

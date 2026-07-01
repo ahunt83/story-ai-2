@@ -144,7 +144,7 @@ export function StoryBibleWorkspace() {
         { label: "Drafts", href: story ? `/writing/co-writer?storyId=${story.id}` : "/writing/co-writer" },
         { label: "Story Bible", href: story ? `/bible?storyId=${story.id}` : "/bible", active: true }
       ]}
-      action={story ? <Link href={`/writing?storyId=${story.id}`} className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">Back to Writing</Link> : <Link href="/" className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">Create Story</Link>}
+      action={story ? <Link href={`/writing?storyId=${story.id}`} className="rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105">Back to Writing</Link> : <Link href="/" className="rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105">Create Story</Link>}
     >
       <div className="mx-auto max-w-7xl px-5 py-10 md:px-8">
         <section className="mb-8">
@@ -166,7 +166,7 @@ export function StoryBibleWorkspace() {
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
               Once a chapter has committed memory, characters, threads, locations, and facts will appear here.
             </p>
-            <Link href="/" className="mt-5 inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">Go to Library</Link>
+            <Link href="/" className="mt-5 inline-flex items-center rounded-md bg-intelligence-teal px-4 py-2 text-sm font-bold text-on-primary transition hover:brightness-105">Go to Library</Link>
           </section>
         ) : null}
 
@@ -187,9 +187,9 @@ export function StoryBibleWorkspace() {
           <aside className="space-y-5 lg:col-span-4">
             <div className="rounded-md border border-memory-border bg-white p-5 soft-shadow">
               <div className="mb-5 aspect-square rounded-md bg-gradient-to-br from-surface-container-low to-intelligence-glow p-6">
-                <div className="flex h-full items-end rounded-md bg-primary-container p-4 text-parchment-base">
+                <div className="flex h-full items-end rounded-md bg-primary-container p-4 text-on-surface">
                   <div>
-                    <span className="mb-3 inline-block rounded bg-intelligence-teal px-2 py-1 text-[10px] font-bold uppercase text-white">{character?.importance ?? "pending"}</span>
+                    <span className="mb-3 inline-block rounded bg-intelligence-teal px-2 py-1 text-[10px] font-bold uppercase text-on-primary">{character?.importance ?? "pending"}</span>
                     <h3 className="headline-serif text-2xl">{character?.name ?? "No Character Yet"}</h3>
                     <p className="text-sm text-on-primary-container">{character?.roleInStory ?? "Commit memory to reveal live character state."}</p>
                   </div>
@@ -284,7 +284,7 @@ export function StoryBibleWorkspace() {
               </div>
             </section>
 
-            <div className="rounded-md bg-primary-container p-5 text-parchment-base">
+            <div className="rounded-md bg-primary-container p-5 text-on-surface">
               <div className="mb-3 flex items-center gap-2 text-intelligence-teal">
                 <MapPin size={17} />
                 <h5 className="font-bold">{hasLiveData ? "Continuity synced" : "Continuity waiting"}</h5>
