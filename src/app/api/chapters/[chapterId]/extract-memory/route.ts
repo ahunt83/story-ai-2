@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chapterMemories, chapters, scenes } from "@/db/schema";
+import { characterCandidates, chapterMemories, chapters, scenes } from "@/db/schema";
 import { startAiRun } from "@/lib/ai-runs";
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
@@ -77,6 +77,19 @@ export async function POST(_request: Request, context: { params: Promise<{ chapt
         extractionModel: modelSettings.extractionModel,
         rawResponse: extraction.raw
       });
+
+      if (extraction.parsed.newCharacterCandidates.length > 0) {
+        await tx.insert(characterCandidates).values(extraction.parsed.newCharacterCandidates.map((candidate) => ({
+          id: candidate.candidateId || createId("candidate"),
+          storyId: bundle.story.id,
+          chapterId,
+          chapterMemoryId: memoryId,
+          possibleName: candidate.possibleName,
+          confidence: candidate.confidence,
+          evidence: candidate.sceneEvidence,
+          suggestedProfile: candidate.suggestedCharacterProfile
+        }))).onConflictDoNothing();
+      }
     });
 
     await aiRun.succeed({

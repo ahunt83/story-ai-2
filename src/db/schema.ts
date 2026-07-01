@@ -26,10 +26,39 @@ export const aiRunOperationEnum = pgEnum("ai_run_operation", [
   "extract_memory",
   "merge_story_bible",
   "story_foundation",
-  "embedding"
+  "embedding",
+  "character_image_generation",
+  "character_image_analysis",
+  "character_development"
 ]);
 export const aiRunStatusEnum = pgEnum("ai_run_status", ["started", "succeeded", "failed"]);
 export const storyFoundationStatusEnum = pgEnum("story_foundation_status", ["draft", "approved"]);
+export const characterStatusEnum = pgEnum("character_status", ["draft", "active", "inactive", "dead", "missing", "archived"]);
+export const characterImportanceEnum = pgEnum("character_importance", ["protagonist", "major", "supporting", "minor", "background"]);
+export const characterCreatedFromEnum = pgEnum("character_created_from", ["story_foundation", "manual", "image", "scene", "chapter_extraction", "imported"]);
+export const characterCanonLevelEnum = pgEnum("character_canon_level", ["confirmed", "tentative", "mixed"]);
+export const characterAssetTypeEnum = pgEnum("character_asset_type", [
+  "draft",
+  "canonical_reference",
+  "alternate_outfit",
+  "expression",
+  "pose",
+  "scene_image",
+  "rejected"
+]);
+export const characterCandidateStatusEnum = pgEnum("character_candidate_status", ["pending", "added", "merged", "ignored", "background"]);
+export const characterSourceTypeEnum = pgEnum("character_source_type", [
+  "user_entered",
+  "user_confirmed",
+  "story_foundation",
+  "image_generation_prompt",
+  "image_extraction",
+  "scene_extraction",
+  "chapter_extraction",
+  "ai_suggestion",
+  "story_bible_merge"
+]);
+export const characterFieldCanonStatusEnum = pgEnum("character_field_canon_status", ["confirmed", "tentative", "suggested", "contradicted", "deprecated"]);
 export const memoryCategoryEnum = pgEnum("memory_category", [
   "canon_fact",
   "character_state",
@@ -173,11 +202,93 @@ export const storyModelSettings = pgTable("story_model_settings", {
   revisionModel: text("revision_model").notNull(),
   extractionModel: text("extraction_model").notNull(),
   embeddingModel: text("embedding_model").notNull(),
+  imageModel: text("image_model").notNull(),
+  visionModel: text("vision_model").notNull(),
   generationTemperature: real("generation_temperature").notNull(),
   revisionTemperature: real("revision_temperature").notNull(),
   maxTokens: integer("max_tokens").notNull(),
   ...timestamps
 });
+
+export const characters = pgTable("characters", {
+  id: text("id").primaryKey(),
+  storyId: text("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  displayName: text("display_name"),
+  aliases: jsonb("aliases").$type<string[]>().notNull().default([]),
+  status: characterStatusEnum("status").notNull().default("draft"),
+  importance: characterImportanceEnum("importance").notNull().default("supporting"),
+  createdFrom: characterCreatedFromEnum("created_from").notNull().default("manual"),
+  canonLevel: characterCanonLevelEnum("canon_level").notNull().default("tentative"),
+  profile: jsonb("profile").$type<Record<string, unknown>>().notNull(),
+  primaryImageAssetId: text("primary_image_asset_id"),
+  visualSummary: text("visual_summary"),
+  voiceSummary: text("voice_summary"),
+  currentStateSummary: text("current_state_summary"),
+  ...timestamps
+}, (table) => ({
+  storyNameIdx: index("characters_story_name_idx").on(table.storyId, table.name),
+  storyImportanceIdx: index("characters_story_importance_idx").on(table.storyId, table.importance)
+}));
+
+export const characterImageAssets = pgTable("character_image_assets", {
+  id: text("id").primaryKey(),
+  storyId: text("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
+  characterId: text("character_id").notNull().references(() => characters.id, { onDelete: "cascade" }),
+  type: characterAssetTypeEnum("type").notNull().default("draft"),
+  uri: text("uri").notNull(),
+  thumbnailUri: text("thumbnail_uri"),
+  storageKey: text("storage_key"),
+  mediaType: text("media_type").notNull().default("image/png"),
+  imageModel: text("image_model"),
+  prompt: text("prompt"),
+  negativePrompt: text("negative_prompt"),
+  seed: text("seed"),
+  aspectRatio: text("aspect_ratio"),
+  style: text("style"),
+  sourceImageAssetId: text("source_image_asset_id"),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  isCanonical: boolean("is_canonical").notNull().default(false),
+  generation: jsonb("generation").$type<Record<string, unknown>>().notNull().default({}),
+  extractedVisualDetails: jsonb("extracted_visual_details").$type<Record<string, unknown>>().notNull().default({}),
+  userFeedback: jsonb("user_feedback").$type<Record<string, unknown>>().notNull().default({}),
+  ...timestamps
+}, (table) => ({
+  characterAssetIdx: index("character_image_assets_character_idx").on(table.characterId),
+  storyAssetIdx: index("character_image_assets_story_idx").on(table.storyId)
+}));
+
+export const characterFieldSources = pgTable("character_field_sources", {
+  id: text("id").primaryKey(),
+  storyId: text("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
+  characterId: text("character_id").notNull().references(() => characters.id, { onDelete: "cascade" }),
+  fieldPath: text("field_path").notNull(),
+  value: text("value").notNull(),
+  sourceType: characterSourceTypeEnum("source_type").notNull(),
+  sourceId: text("source_id"),
+  confidence: text("confidence"),
+  canonStatus: characterFieldCanonStatusEnum("canon_status").notNull().default("suggested"),
+  ...timestamps
+}, (table) => ({
+  characterFieldIdx: index("character_field_sources_character_field_idx").on(table.characterId, table.fieldPath)
+}));
+
+export const characterCandidates = pgTable("character_candidates", {
+  id: text("id").primaryKey(),
+  storyId: text("story_id").notNull().references(() => stories.id, { onDelete: "cascade" }),
+  chapterId: text("chapter_id").references(() => chapters.id, { onDelete: "cascade" }),
+  chapterMemoryId: text("chapter_memory_id").references(() => chapterMemories.id, { onDelete: "cascade" }),
+  possibleName: text("possible_name").notNull(),
+  confidence: text("confidence").notNull().default("medium"),
+  status: characterCandidateStatusEnum("status").notNull().default("pending"),
+  evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull(),
+  suggestedProfile: jsonb("suggested_profile").$type<Record<string, unknown>>().notNull().default({}),
+  resolvedCharacterId: text("resolved_character_id").references(() => characters.id, { onDelete: "set null" }),
+  ...timestamps
+}, (table) => ({
+  storyCandidateIdx: index("character_candidates_story_status_idx").on(table.storyId, table.status),
+  chapterCandidateIdx: index("character_candidates_chapter_idx").on(table.chapterId)
+}));
 
 export const memoryItems = pgTable("memory_items", {
   id: text("id").primaryKey(),
@@ -249,6 +360,8 @@ export const storiesRelations = relations(stories, ({ many, one }) => ({
   bible: one(storyBibles),
   foundation: one(storyFoundations),
   modelSettings: one(storyModelSettings),
+  characters: many(characters),
+  characterCandidates: many(characterCandidates),
   aiRuns: many(aiRuns)
 }));
 
@@ -266,7 +379,8 @@ export const scenesRelations = relations(scenes, ({ one, many }) => ({
 export const chapterMemoriesRelations = relations(chapterMemories, ({ one, many }) => ({
   story: one(stories, { fields: [chapterMemories.storyId], references: [stories.id] }),
   chapter: one(chapters, { fields: [chapterMemories.chapterId], references: [chapters.id] }),
-  items: many(memoryItems)
+  items: many(memoryItems),
+  characterCandidates: many(characterCandidates)
 }));
 
 export const storyBiblesRelations = relations(storyBibles, ({ one }) => ({
@@ -279,6 +393,30 @@ export const storyFoundationsRelations = relations(storyFoundations, ({ one }) =
 
 export const storyModelSettingsRelations = relations(storyModelSettings, ({ one }) => ({
   story: one(stories, { fields: [storyModelSettings.storyId], references: [stories.id] })
+}));
+
+export const charactersRelations = relations(characters, ({ one, many }) => ({
+  story: one(stories, { fields: [characters.storyId], references: [stories.id] }),
+  imageAssets: many(characterImageAssets),
+  fieldSources: many(characterFieldSources),
+  candidates: many(characterCandidates)
+}));
+
+export const characterImageAssetsRelations = relations(characterImageAssets, ({ one }) => ({
+  story: one(stories, { fields: [characterImageAssets.storyId], references: [stories.id] }),
+  character: one(characters, { fields: [characterImageAssets.characterId], references: [characters.id] })
+}));
+
+export const characterFieldSourcesRelations = relations(characterFieldSources, ({ one }) => ({
+  story: one(stories, { fields: [characterFieldSources.storyId], references: [stories.id] }),
+  character: one(characters, { fields: [characterFieldSources.characterId], references: [characters.id] })
+}));
+
+export const characterCandidatesRelations = relations(characterCandidates, ({ one }) => ({
+  story: one(stories, { fields: [characterCandidates.storyId], references: [stories.id] }),
+  chapter: one(chapters, { fields: [characterCandidates.chapterId], references: [chapters.id] }),
+  chapterMemory: one(chapterMemories, { fields: [characterCandidates.chapterMemoryId], references: [chapterMemories.id] }),
+  resolvedCharacter: one(characters, { fields: [characterCandidates.resolvedCharacterId], references: [characters.id] })
 }));
 
 export const aiRunsRelations = relations(aiRuns, ({ one }) => ({

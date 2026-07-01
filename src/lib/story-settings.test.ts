@@ -10,6 +10,8 @@ describe("story model settings", () => {
       revisionModel: env.openRouterChatModel,
       extractionModel: env.openRouterExtractModel,
       embeddingModel: env.openRouterEmbeddingModel,
+      imageModel: env.openRouterImageModel,
+      visionModel: env.openRouterVisionModel,
       generationTemperature: 0.8,
       revisionTemperature: 0.7,
       maxTokens: 1800
@@ -22,6 +24,8 @@ describe("story model settings", () => {
       revisionModel: env.openRouterNsfwRevisionModel,
       extractionModel: env.openRouterNsfwExtractModel,
       embeddingModel: env.openRouterEmbeddingModel,
+      imageModel: env.openRouterImageModel,
+      visionModel: env.openRouterVisionModel,
       generationTemperature: 0.8,
       revisionTemperature: 0.7,
       maxTokens: 1800

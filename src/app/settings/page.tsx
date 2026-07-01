@@ -20,8 +20,12 @@ export default async function SettingsPage() {
     ["NSFW chat model", env.openRouterNsfwChatModel],
     ["NSFW revision model", env.openRouterNsfwRevisionModel],
     ["NSFW extraction model", env.openRouterNsfwExtractModel],
+    ["Image model", env.openRouterImageModel],
+    ["Vision model", env.openRouterVisionModel],
     ["Embedding model", env.openRouterEmbeddingModel],
     ["Embedding dimensions", String(env.openRouterEmbeddingDimensions)],
+    ["Asset storage", env.assetStorageDriver],
+    ["Local asset root", env.localAssetRoot],
     ["API key", env.openRouterApiKey ? "Configured" : "Missing"]
   ];
 

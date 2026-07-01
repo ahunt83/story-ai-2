@@ -1,9 +1,10 @@
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { memoryItems, memorySimilarity, storyBibles, storyFoundations } from "@/db/schema";
+import { characterCandidates, characterFieldSources, characterImageAssets, characters, memoryItems, memorySimilarity, storyBibles, storyFoundations } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
+import { normalizeProfile } from "@/lib/characters/profiles";
 import { createEmbeddingsWithModel } from "@/lib/openrouter";
 import { requireOwnedStory } from "@/lib/ownership";
 import { buildStoryFoundationContext } from "@/lib/story-foundation/context";
@@ -43,6 +44,12 @@ export async function GET(request: Request, context: { params: Promise<{ storyId
       query,
       embeddingModel: modelSettings.embeddingModel
     });
+    const [characterRows, imageRows, sourceRows, candidateRows] = await Promise.all([
+      db.select().from(characters).where(eq(characters.storyId, storyId)).orderBy(desc(characters.updatedAt)),
+      db.select().from(characterImageAssets).where(eq(characterImageAssets.storyId, storyId)).orderBy(desc(characterImageAssets.createdAt)),
+      db.select().from(characterFieldSources).where(eq(characterFieldSources.storyId, storyId)).orderBy(desc(characterFieldSources.createdAt)),
+      db.select().from(characterCandidates).where(eq(characterCandidates.storyId, storyId)).orderBy(desc(characterCandidates.createdAt))
+    ]);
 
     return ok({
       bible: parsedBible,
@@ -55,6 +62,13 @@ export async function GET(request: Request, context: { params: Promise<{ storyId
       warnings: parsedBible?.continuityWarnings ?? [],
       foundationStatus: foundation?.status ?? null,
       foundationContext: parsedFoundation ? buildStoryFoundationContext(parsedFoundation, foundation.status) : null,
+      characterProfiles: characterRows.map((character) => ({
+        ...character,
+        profile: normalizeProfile(character.profile, character.id, character.name),
+        imageAssets: imageRows.filter((asset) => asset.characterId === character.id),
+        fieldSources: sourceRows.filter((source) => source.characterId === character.id)
+      })),
+      characterCandidates: candidateRows,
       memoryItems: memoryRows,
       lastUpdatedFromChapterNumber: bible?.lastUpdatedFromChapterNumber ?? 0
     });

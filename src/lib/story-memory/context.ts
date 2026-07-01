@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chapterMemories, memoryItems, memorySimilarity, storyBibles, storyFoundations } from "@/db/schema";
+import { chapterMemories, characters, memoryItems, memorySimilarity, storyBibles, storyFoundations } from "@/db/schema";
 import { createEmbeddingsWithModel } from "@/lib/openrouter";
 import { env } from "@/lib/env";
+import { compactCharacterContext, normalizeProfile } from "@/lib/characters/profiles";
 import { buildStoryFoundationContext } from "@/lib/story-foundation/context";
 import { storyFoundationSchema } from "@/lib/story-foundation/schema";
 import { storyBibleSchema, type ChapterContext } from "./schema";
@@ -63,6 +64,13 @@ export async function buildContextForChapter(params: {
     fallbackCategories: params.categories?.length ? params.categories : ["canon_fact", "character_state", "open_thread", "continuity_warning"]
   });
 
+  const characterRows = await db
+    .select()
+    .from(characters)
+    .where(eq(characters.storyId, params.storyId))
+    .orderBy(asc(characters.name))
+    .limit(16);
+
   return {
     storyBible: bibleRecord?.bible ? storyBibleSchema.parse(bibleRecord.bible) : null,
     storyFoundationContext: parsedFoundation
@@ -79,6 +87,7 @@ export async function buildContextForChapter(params: {
     })).filter((item) => item.summary.length > 0),
     criticalFacts: criticalFacts as ChapterContext["criticalFacts"],
     relevantMemoryItems,
+    charactersForThisChapter: characterRows.map((character) => compactCharacterContext(normalizeProfile(character.profile, character.id, character.name))),
     openThreads: openThreads as ChapterContext["openThreads"],
     styleAndVoice: bibleRecord?.bible && typeof bibleRecord.bible === "object"
       ? storyBibleSchema.parse(bibleRecord.bible).narrativeStyleConstraints

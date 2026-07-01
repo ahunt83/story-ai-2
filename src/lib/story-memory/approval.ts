@@ -3,6 +3,7 @@ import type { ChapterMemory, Importance, Persistence } from "./schema";
 export type ReviewableSection =
   | "canonFactsEstablished"
   | "characterStates"
+  | "newCharacterCandidates"
   | "openThreads"
   | "continuityWarnings"
   | "doNotForget";
@@ -24,6 +25,7 @@ export function approvedMemory(memory: ChapterMemory, inclusions: ReviewInclusio
     ...memory,
     canonFactsEstablished: memory.canonFactsEstablished.filter((_, index) => isIncluded(inclusions, "canonFactsEstablished", index)),
     characterStates: memory.characterStates.filter((_, index) => isIncluded(inclusions, "characterStates", index)),
+    newCharacterCandidates: memory.newCharacterCandidates.filter((_, index) => isIncluded(inclusions, "newCharacterCandidates", index)),
     openThreads: memory.openThreads.filter((_, index) => isIncluded(inclusions, "openThreads", index)),
     continuityWarnings: memory.continuityWarnings.filter((_, index) => isIncluded(inclusions, "continuityWarnings", index)),
     doNotForget: memory.doNotForget.filter((_, index) => isIncluded(inclusions, "doNotForget", index))
