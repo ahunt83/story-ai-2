@@ -130,6 +130,8 @@ Writing:
 - Focused manuscript canvas.
 - Continuity context visible but secondary.
 - Memory Check and Suggest Next Beat actions should be available without approving a chapter.
+- Chapter and scene navigation should stay compact and scan-friendly.
+- Autosave status should be visible without pulling attention away from prose.
 
 AI Co-writer:
 
@@ -141,12 +143,12 @@ Memory Approval:
 
 - Read-only chapter text beside extracted memory.
 - User should be able to review, edit, include/exclude, and commit.
-- Editing/toggling is a TODO.
+- Excluded cards remain visible but muted so the reviewer can recover them quickly.
 
 Story Bible:
 
 - Continuity explorer for characters, plot threads, locations, worldbuilding, and canon facts.
-- Should eventually use real `story_bibles` and `memory_items`.
+- Uses real `story_bibles` and normalized `memory_items`, with sample data reserved for useful empty states.
 
 ## Design Guardrails
 

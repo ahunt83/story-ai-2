@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { aiMessages, draftVersions, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
 import { createId } from "@/lib/ids";
-import { generateDraft } from "@/lib/story-memory/ai";
+import { OpenRouterRequestError } from "@/lib/openrouter";
+import { generateDraftRun } from "@/lib/story-memory/ai";
 import { buildContextForChapter } from "@/lib/story-memory/context";
 import { createMockContext } from "@/lib/story-memory/mock";
 import { loadChapterBundle } from "../helpers";
@@ -34,11 +35,30 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       query: input.direction
     }).catch(() => createMockContext());
 
-    const draft = await generateDraft({
-      storyTitle: bundle.story.title,
-      direction: input.direction,
-      context: chapterContext
-    });
+    let run: Awaited<ReturnType<typeof generateDraftRun>>;
+    try {
+      run = await generateDraftRun({
+        storyTitle: bundle.story.title,
+        direction: input.direction,
+        context: chapterContext
+      });
+    } catch (error) {
+      await db.insert(aiMessages).values({
+        id: createId("msg"),
+        storyId: bundle.story.id,
+        chapterId,
+        role: "assistant",
+        content: error instanceof Error ? error.message : "Generation failed",
+        metadata: {
+          status: "failed",
+          kind: "generate",
+          providerStatus: error instanceof OpenRouterRequestError ? error.status : undefined
+        }
+      });
+      throw error;
+    }
+
+    const draft = run.content;
 
     await db.transaction(async (tx) => {
       if (targetScene.draftText) {
@@ -55,7 +75,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       await tx.update(scenes).set({ draftText: draft, updatedAt: new Date() }).where(eq(scenes.id, targetScene.id));
       await tx.insert(aiMessages).values([
         { id: createId("msg"), storyId: bundle.story.id, chapterId, role: "user", content: input.direction },
-        { id: createId("msg"), storyId: bundle.story.id, chapterId, role: "assistant", content: draft }
+        { id: createId("msg"), storyId: bundle.story.id, chapterId, role: "assistant", content: draft, metadata: { kind: "generate", usage: run.usage, fallbackUsed: run.fallbackUsed } }
       ]);
     });
 

@@ -76,7 +76,9 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
             lastUpdatedFromChapterNumber: memory.chapterMetadata.chapterNumber,
             updatedAt: new Date()
           }
-        });
+      });
+
+      await tx.delete(memoryItems).where(eq(memoryItems.chapterMemoryId, memoryId));
 
       if (normalized.length > 0) {
         await tx.insert(memoryItems).values(normalized.map((item, index) => ({

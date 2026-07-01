@@ -14,8 +14,9 @@ When a chapter is finalized:
 4. App validates the JSON with Zod.
 5. If invalid, app retries once with a repair prompt.
 6. App stores the memory in `chapter_memories`.
-7. User can review memory in the extraction UI.
-8. Commit updates the Story Bible, normalizes memory items, creates embeddings, and marks the chapter approved.
+7. User can review, edit, include, or exclude extracted memory in the extraction UI.
+8. Client validation runs `chapterMemorySchema.safeParse` before commit.
+9. Commit updates the Story Bible, replaces prior normalized rows for the chapter memory, creates embeddings, and marks the chapter approved.
 
 ## Core Types
 
@@ -142,15 +143,11 @@ Current implementation:
 - Builds deterministic summary windows.
 - Pulls critical facts and major/critical open threads.
 - Uses embeddings when `query` is supplied.
+- Supports `characters`, `categories`, and `limit` filters in the context API.
 - Falls back to recent important memory items if no query/embedding.
-
-Planned improvements:
-
-- character filters,
-- category filters,
-- ranking boosts for importance/open status,
-- guaranteed inclusion of critical facts,
-- context preview UI.
+- Boosts critical/major/open-thread/continuity-warning rows after semantic matching.
+- Keeps deterministic critical facts in the context package even when semantic rank is low.
+- Shows the same context package in the writing sidebar that generation and Memory Check use.
 
 ## OpenRouter Integration
 
@@ -175,6 +172,13 @@ No-key behavior:
 
 Keep this no-key path working for tests and local development.
 
+Production behavior:
+
+- OpenRouter auth, insufficient credits, rate limits, and structured-output support errors are mapped to user-facing messages.
+- Generation/revision store returned token usage in `ai_messages.metadata` when available.
+- Failed generation/revision attempts are stored in `ai_messages.metadata` with `status: "failed"`.
+- Streaming generation is not implemented yet; keep extraction non-streaming because structured JSON validation is simpler.
+
 ## Validation And Repair
 
 Validation is Zod-based.
@@ -194,7 +198,7 @@ If validation fails:
 - Repair prompt must not add new facts.
 - If still invalid, store/report validation failure.
 
-Current implementation has the core validation and fallback structure, but extraction failure review UI can be improved.
+Current implementation has the core validation and fallback structure. The approval UI now validates edited memory before posting it.
 
 ## Normalized Memory Items
 
@@ -202,12 +206,14 @@ Implemented in `src/lib/story-memory/normalize.ts`.
 
 Current normalized categories include:
 
+- `summary`
 - `canon_fact`
 - `character_state`
 - `open_thread`
 - `continuity_warning`
 - `location`
 - `object`
+- `worldbuilding`
 
 Each normalized memory item stores:
 

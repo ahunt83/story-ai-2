@@ -17,6 +17,24 @@ function item(params: NormalizedMemoryItem): NormalizedMemoryItem {
 export function normalizeChapterMemory(memory: ChapterMemory): NormalizedMemoryItem[] {
   const items: NormalizedMemoryItem[] = [];
 
+  items.push(item({
+    category: "summary",
+    label: "Short summary",
+    content: memory.summaries.shortSummary,
+    importance: "major",
+    persistence: "permanent",
+    payload: { kind: "shortSummary", content: memory.summaries.shortSummary }
+  }));
+
+  items.push(item({
+    category: "summary",
+    label: "Medium summary",
+    content: memory.summaries.mediumSummary,
+    importance: "major",
+    persistence: "permanent",
+    payload: { kind: "mediumSummary", content: memory.summaries.mediumSummary }
+  }));
+
   for (const fact of memory.canonFactsEstablished) {
     items.push(item({
       category: "canon_fact",
@@ -91,6 +109,30 @@ export function normalizeChapterMemory(memory: ChapterMemory): NormalizedMemoryI
       persistence: object.persistence,
       evidenceOrBasis: object.evidenceOrBasis,
       payload: object
+    }));
+  }
+
+  for (const worldbuilding of memory.worldbuilding) {
+    items.push(item({
+      category: "worldbuilding",
+      label: worldbuilding.category,
+      content: [worldbuilding.detail, worldbuilding.implications].filter(Boolean).join(" "),
+      importance: worldbuilding.importance,
+      persistence: worldbuilding.persistence,
+      evidenceOrBasis: worldbuilding.evidenceOrBasis,
+      payload: worldbuilding
+    }));
+  }
+
+  for (const reminder of memory.doNotForget) {
+    items.push(item({
+      category: "canon_fact",
+      label: "Do not forget",
+      content: [reminder.item, reminder.reason].filter(Boolean).join(" "),
+      importance: reminder.importance,
+      persistence: reminder.persistence,
+      evidenceOrBasis: reminder.evidenceOrBasis,
+      payload: reminder
     }));
   }
 

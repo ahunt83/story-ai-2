@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Edit3, FileText, Loader2, PersonStanding, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
-import { Button, ImportancePill, MemoryCard, SectionHeading } from "@/components/ui";
+import { Button, ImportancePill, SectionHeading } from "@/components/ui";
 import { WritingCanvas } from "@/components/writing-canvas";
 import { apiFetch } from "@/lib/client-api";
 import { sampleMemory } from "@/lib/sample-data";
-import type { ChapterMemory } from "@/lib/story-memory/schema";
+import { approvedMemory, importanceOptions, isIncluded, persistenceOptions, type ReviewInclusions, type ReviewableSection } from "@/lib/story-memory/approval";
+import { chapterMemorySchema, type ChapterMemory, type Importance, type Persistence } from "@/lib/story-memory/schema";
 
 type ChapterBundle = {
   story: { id: string; title: string };
@@ -20,10 +22,13 @@ type ChapterBundle = {
 };
 
 export function ExtractionWorkspace() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const chapterId = searchParams.get("chapterId");
   const [bundle, setBundle] = useState<ChapterBundle | null>(null);
   const [memory, setMemory] = useState<ChapterMemory>(sampleMemory);
+  const [inclusions, setInclusions] = useState<ReviewInclusions>({});
+  const [validationIssues, setValidationIssues] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -69,6 +74,8 @@ export function ExtractionWorkspace() {
         body: JSON.stringify({})
       });
       setMemory(result.memory);
+      setInclusions({});
+      setValidationIssues([]);
       setNotice(result.repaired ? "Memory extracted after repair and is ready for review." : "Memory extracted and ready for review.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not extract memory");
@@ -86,18 +93,53 @@ export function ExtractionWorkspace() {
     setBusy("commit");
     setError(null);
     setNotice(null);
+    setValidationIssues([]);
 
     try {
+      const memoryToCommit = approvedMemory(memory, inclusions);
+      const parsed = chapterMemorySchema.safeParse(memoryToCommit);
+      if (!parsed.success) {
+        setValidationIssues(parsed.error.issues.map((issue) => `${issue.path.join(".") || "memory"}: ${issue.message}`));
+        setBusy(null);
+        return;
+      }
+
       const result = await apiFetch<{ memoryItems: number; storyBible: unknown }>(`/api/chapters/${chapterId}/commit-memory`, {
         method: "POST",
-        body: JSON.stringify({ memory })
+        body: JSON.stringify({ memory: parsed.data })
       });
       setNotice(`Committed to Story Bible with ${result.memoryItems} searchable memory items.`);
+      if (bundle?.story.id) {
+        router.push(`/bible?storyId=${bundle.story.id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not commit memory");
     } finally {
       setBusy(null);
     }
+  }
+
+  function toggle(section: ReviewableSection, index: number) {
+    setInclusions((current) => ({
+      ...current,
+      [`${section}:${index}`]: !isIncluded(current, section, index)
+    }));
+  }
+
+  function updateSummary(key: keyof ChapterMemory["summaries"], value: string) {
+    setMemory((current) => ({ ...current, summaries: { ...current.summaries, [key]: value } }));
+  }
+
+  function updateArrayItem<Section extends ReviewableSection>(
+    section: Section,
+    index: number,
+    updater: (item: ChapterMemory[Section][number]) => ChapterMemory[Section][number]
+  ) {
+    setMemory((current) => {
+      const nextItems = [...current[section]] as ChapterMemory[Section];
+      nextItems[index] = updater(nextItems[index]);
+      return { ...current, [section]: nextItems };
+    });
   }
 
   return (
@@ -132,24 +174,42 @@ export function ExtractionWorkspace() {
             </div>
             {error ? <p className="mt-3 text-sm font-bold text-red-700">{error}</p> : null}
             {notice ? <p className="mt-3 text-sm font-bold text-intelligence-teal">{notice}</p> : null}
+            {validationIssues.length > 0 ? (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">
+                {validationIssues.slice(0, 4).map((issue) => <p key={issue}>{issue}</p>)}
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-6 p-6">
             <section>
               <SectionHeading icon={<FileText size={16} />} title="Chapter Summaries" />
-              <SummaryCard label="Short" content={memory.summaries.shortSummary} active />
-              <SummaryCard label="Medium" content={memory.summaries.mediumSummary} />
-              <SummaryCard label="Long" content={memory.summaries.longSummary} />
+              <SummaryCard label="Short" content={memory.summaries.shortSummary} active onChange={(value) => updateSummary("shortSummary", value)} />
+              <SummaryCard label="Medium" content={memory.summaries.mediumSummary} onChange={(value) => updateSummary("mediumSummary", value)} />
+              <SummaryCard label="Long" content={memory.summaries.longSummary} onChange={(value) => updateSummary("longSummary", value)} />
             </section>
 
             <section>
               <SectionHeading icon={<PersonStanding size={16} />} title="Character States" />
               <div className="space-y-3">
-                {memory.characterStates.length > 0 ? memory.characterStates.map((character) => (
-                  <MemoryCard key={character.name} title={character.name} importance={character.importance} meta={character.evidenceOrBasis}>
-                    <p>{character.emotionalState ?? character.statusAtChapterEnd}</p>
-                    <p className="mt-2">{character.continuityNotes.join(" ")}</p>
-                  </MemoryCard>
+                {memory.characterStates.length > 0 ? memory.characterStates.map((character, index) => (
+                  <EditableCard
+                    key={`${character.name}-${index}`}
+                    title={character.name}
+                    section="characterStates"
+                    index={index}
+                    included={isIncluded(inclusions, "characterStates", index)}
+                    importance={character.importance}
+                    persistence={character.persistence}
+                    onToggle={toggle}
+                    onImportance={(importance) => updateArrayItem("characterStates", index, (item) => ({ ...item, importance }))}
+                    onPersistence={(persistence) => updateArrayItem("characterStates", index, (item) => ({ ...item, persistence }))}
+                  >
+                    <LabeledInput label="Name" value={character.name} onChange={(value) => updateArrayItem("characterStates", index, (item) => ({ ...item, name: value }))} />
+                    <LabeledTextarea label="Status" value={character.statusAtChapterEnd ?? ""} onChange={(value) => updateArrayItem("characterStates", index, (item) => ({ ...item, statusAtChapterEnd: value }))} />
+                    <LabeledTextarea label="Emotional state" value={character.emotionalState ?? ""} onChange={(value) => updateArrayItem("characterStates", index, (item) => ({ ...item, emotionalState: value }))} />
+                    <LabeledTextarea label="Continuity notes" value={character.continuityNotes.join("\n")} onChange={(value) => updateArrayItem("characterStates", index, (item) => ({ ...item, continuityNotes: lines(value) }))} />
+                  </EditableCard>
                 )) : <EmptyMemory label="No character states extracted yet." />}
               </div>
             </section>
@@ -157,23 +217,95 @@ export function ExtractionWorkspace() {
             <section>
               <SectionHeading title="New Canon Facts" />
               <div className="space-y-3">
-                {memory.canonFactsEstablished.map((fact) => (
-                  <MemoryCard key={fact.fact} title={fact.category} importance={fact.importance} meta={fact.evidenceOrBasis}>
-                    {fact.fact}
-                  </MemoryCard>
+                {memory.canonFactsEstablished.map((fact, index) => (
+                  <EditableCard
+                    key={`${fact.category}-${index}`}
+                    title={fact.category}
+                    section="canonFactsEstablished"
+                    index={index}
+                    included={isIncluded(inclusions, "canonFactsEstablished", index)}
+                    importance={fact.importance}
+                    persistence={fact.persistence}
+                    onToggle={toggle}
+                    onImportance={(importance) => updateArrayItem("canonFactsEstablished", index, (item) => ({ ...item, importance }))}
+                    onPersistence={(persistence) => updateArrayItem("canonFactsEstablished", index, (item) => ({ ...item, persistence }))}
+                  >
+                    <LabeledInput label="Category" value={fact.category} onChange={(value) => updateArrayItem("canonFactsEstablished", index, (item) => ({ ...item, category: value }))} />
+                    <LabeledTextarea label="Fact" value={fact.fact} onChange={(value) => updateArrayItem("canonFactsEstablished", index, (item) => ({ ...item, fact: value }))} />
+                    <LabeledTextarea label="Evidence" value={fact.evidenceOrBasis ?? ""} onChange={(value) => updateArrayItem("canonFactsEstablished", index, (item) => ({ ...item, evidenceOrBasis: value || undefined }))} />
+                  </EditableCard>
                 ))}
+              </div>
+            </section>
+
+            <section>
+              <SectionHeading title="Open Threads" />
+              <div className="space-y-3">
+                {memory.openThreads.length > 0 ? memory.openThreads.map((thread, index) => (
+                  <EditableCard
+                    key={`${thread.thread}-${index}`}
+                    title={thread.thread}
+                    section="openThreads"
+                    index={index}
+                    included={isIncluded(inclusions, "openThreads", index)}
+                    importance={thread.importance}
+                    persistence={thread.persistence}
+                    onToggle={toggle}
+                    onImportance={(importance) => updateArrayItem("openThreads", index, (item) => ({ ...item, importance }))}
+                    onPersistence={(persistence) => updateArrayItem("openThreads", index, (item) => ({ ...item, persistence }))}
+                  >
+                    <LabeledInput label="Thread" value={thread.thread} onChange={(value) => updateArrayItem("openThreads", index, (item) => ({ ...item, thread: value }))} />
+                    <LabeledTextarea label="Status" value={thread.status} onChange={(value) => updateArrayItem("openThreads", index, (item) => ({ ...item, status: value }))} />
+                    <LabeledTextarea label="Future relevance" value={thread.futureRelevance ?? ""} onChange={(value) => updateArrayItem("openThreads", index, (item) => ({ ...item, futureRelevance: value }))} />
+                  </EditableCard>
+                )) : <EmptyMemory label="No open threads extracted." />}
               </div>
             </section>
 
             <section>
               <SectionHeading title="Continuity Warnings" />
               <div className="space-y-3">
-                {memory.continuityWarnings.length > 0 ? memory.continuityWarnings.map((warning) => (
-                  <MemoryCard key={warning.warning} title={warning.warning} importance={warning.importance} meta={warning.evidenceOrBasis}>
-                    <p>{warning.possibleContradiction}</p>
-                    <p className="mt-2">{warning.suggestedHandling}</p>
-                  </MemoryCard>
+                {memory.continuityWarnings.length > 0 ? memory.continuityWarnings.map((warning, index) => (
+                  <EditableCard
+                    key={`${warning.warning}-${index}`}
+                    title={warning.warning}
+                    section="continuityWarnings"
+                    index={index}
+                    included={isIncluded(inclusions, "continuityWarnings", index)}
+                    importance={warning.importance}
+                    persistence={warning.persistence}
+                    onToggle={toggle}
+                    onImportance={(importance) => updateArrayItem("continuityWarnings", index, (item) => ({ ...item, importance }))}
+                    onPersistence={(persistence) => updateArrayItem("continuityWarnings", index, (item) => ({ ...item, persistence }))}
+                  >
+                    <LabeledInput label="Warning" value={warning.warning} onChange={(value) => updateArrayItem("continuityWarnings", index, (item) => ({ ...item, warning: value }))} />
+                    <LabeledTextarea label="Possible contradiction" value={warning.possibleContradiction ?? ""} onChange={(value) => updateArrayItem("continuityWarnings", index, (item) => ({ ...item, possibleContradiction: value }))} />
+                    <LabeledTextarea label="Suggested handling" value={warning.suggestedHandling ?? ""} onChange={(value) => updateArrayItem("continuityWarnings", index, (item) => ({ ...item, suggestedHandling: value }))} />
+                  </EditableCard>
                 )) : <EmptyMemory label="No continuity warnings extracted." />}
+              </div>
+            </section>
+
+            <section>
+              <SectionHeading title="Do Not Forget" />
+              <div className="space-y-3">
+                {memory.doNotForget.length > 0 ? memory.doNotForget.map((reminder, index) => (
+                  <EditableCard
+                    key={`${reminder.item}-${index}`}
+                    title={reminder.item}
+                    section="doNotForget"
+                    index={index}
+                    included={isIncluded(inclusions, "doNotForget", index)}
+                    importance={reminder.importance}
+                    persistence={reminder.persistence}
+                    onToggle={toggle}
+                    onImportance={(importance) => updateArrayItem("doNotForget", index, (item) => ({ ...item, importance }))}
+                    onPersistence={(persistence) => updateArrayItem("doNotForget", index, (item) => ({ ...item, persistence }))}
+                  >
+                    <LabeledTextarea label="Item" value={reminder.item} onChange={(value) => updateArrayItem("doNotForget", index, (item) => ({ ...item, item: value }))} />
+                    <LabeledTextarea label="Reason" value={reminder.reason ?? ""} onChange={(value) => updateArrayItem("doNotForget", index, (item) => ({ ...item, reason: value }))} />
+                  </EditableCard>
+                )) : <EmptyMemory label="No do-not-forget items extracted." />}
               </div>
             </section>
           </div>
@@ -188,7 +320,7 @@ export function ExtractionWorkspace() {
   );
 }
 
-function SummaryCard({ label, content, active = false }: { label: string; content: string; active?: boolean }) {
+function SummaryCard({ label, content, active = false, onChange }: { label: string; content: string; active?: boolean; onChange: (value: string) => void }) {
   return (
     <div className="mb-3 rounded-md border border-memory-border bg-white p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -198,11 +330,92 @@ function SummaryCard({ label, content, active = false }: { label: string; conten
           <ImportancePill importance={active ? "critical" : "major"} />
         </div>
       </div>
-      <p className="text-sm leading-6 text-on-surface-variant">{content}</p>
+      <textarea
+        value={content}
+        onChange={(event) => onChange(event.target.value)}
+        rows={active ? 3 : 5}
+        className="w-full rounded-md border border-outline-variant px-3 py-2 text-sm leading-6 text-on-surface-variant outline-none focus:border-intelligence-teal"
+      />
     </div>
   );
 }
 
 function EmptyMemory({ label }: { label: string }) {
   return <div className="rounded-md border border-dashed border-outline-variant bg-surface-container-low p-4 text-sm text-on-surface-variant">{label}</div>;
+}
+
+function EditableCard({
+  title,
+  section,
+  index,
+  included,
+  importance,
+  persistence,
+  onToggle,
+  onImportance,
+  onPersistence,
+  children
+}: {
+  title: string;
+  section: ReviewableSection;
+  index: number;
+  included: boolean;
+  importance: Importance;
+  persistence?: Persistence;
+  onToggle: (section: ReviewableSection, index: number) => void;
+  onImportance: (importance: Importance) => void;
+  onPersistence: (persistence: Persistence) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className={included ? "rounded-md border border-memory-border bg-white p-4" : "rounded-md border border-outline-variant bg-surface-container-low p-4 opacity-70"}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-primary">{title}</p>
+          <p className="text-xs font-bold uppercase text-on-surface-variant">{included ? "Included in commit" : "Excluded from commit"}</p>
+        </div>
+        <label className="inline-flex items-center gap-2 text-xs font-bold uppercase text-on-surface-variant">
+          <input type="checkbox" checked={included} onChange={() => onToggle(section, index)} />
+          Include
+        </label>
+      </div>
+      <div className="mb-3 grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold uppercase text-on-surface-variant">
+          Importance
+          <select value={importance} onChange={(event) => onImportance(event.target.value as Importance)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal">
+            {importanceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-bold uppercase text-on-surface-variant">
+          Persistence
+          <select value={persistence ?? "unclear"} onChange={(event) => onPersistence(event.target.value as Persistence)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal">
+            {persistenceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function LabeledInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-xs font-bold uppercase text-on-surface-variant">
+      {label}
+      <input value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal" />
+    </label>
+  );
+}
+
+function LabeledTextarea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-xs font-bold uppercase text-on-surface-variant">
+      {label}
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case leading-6 text-on-surface outline-none focus:border-intelligence-teal" />
+    </label>
+  );
+}
+
+function lines(value: string) {
+  return value.split("\n").map((line) => line.trim()).filter(Boolean);
 }

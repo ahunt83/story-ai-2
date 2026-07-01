@@ -53,7 +53,7 @@ Defined in `src/db/schema.ts`.
 
 Important current limitation:
 
-- Recommitting memory can insert additional `memory_items`. TODO recommends deleting old rows for the chapter memory before inserting edited replacements.
+- Streaming generation is still a future production-hardening step. Generation/revision currently show progress states and store usage/error metadata when OpenRouter returns it.
 
 ## API Routes
 
@@ -63,7 +63,7 @@ Story routes:
 - `GET /api/stories`
 - `GET /api/stories/:storyId`
 - `POST /api/stories/:storyId/chapters`
-- `GET /api/stories/:storyId/bible`
+- `GET /api/stories/:storyId/bible?category=&importance=&q=`
 
 Chapter routes:
 
@@ -74,14 +74,12 @@ Chapter routes:
 - `POST /api/chapters/:chapterId/suggest-next-beat`
 - `POST /api/chapters/:chapterId/extract-memory`
 - `POST /api/chapters/:chapterId/commit-memory`
-- `GET /api/chapters/:chapterId/context`
-
-Planned:
-
-- `PATCH /api/scenes/:sceneId`
-- `GET /api/chapters/:chapterId/versions`
-- `POST /api/chapters/:chapterId/versions/:versionId/restore`
+- `GET /api/chapters/:chapterId/context?query=&characters=&categories=&limit=`
 - `POST /api/chapters/:chapterId/scenes`
+- `GET /api/chapters/:chapterId/versions`
+- `POST /api/chapters/:chapterId/versions`
+- `POST /api/chapters/:chapterId/versions/:versionId/restore`
+- `PATCH /api/scenes/:sceneId`
 
 ## UI Routes
 
@@ -95,16 +93,16 @@ Planned:
 Live route conventions:
 
 - Prefer `?chapterId=:chapterId` for writing and extraction screens.
-- Prefer `?storyId=:storyId` for Story Bible once made live.
+- Prefer `?storyId=:storyId` for Story Bible. If omitted, the page loads the most recently updated active story.
 
 ## Key Components
 
 - `AppShell`: shared left nav, top bar, responsive shell.
 - `LibraryClient`: live story loading and creation modal.
-- `WritingWorkspace`: live chapter loading, generation, revision, memory check, next beat.
-- `ExtractionWorkspace`: live memory extraction and commit flow.
-- `WritingCanvas`: manuscript surface, currently display-oriented.
-- `ContinuityContextPanel`: context/sidebar display.
+- `WritingWorkspace`: live chapter loading, scene selection, autosave, generation/revision, version history, memory check, next beat.
+- `ExtractionWorkspace`: live memory extraction, editable approval, include/exclude toggles, validation, and commit flow.
+- `WritingCanvas`: manuscript surface with editable textarea support.
+- `ContinuityContextPanel`: live context package/sidebar display.
 
 ## Verification Commands
 
@@ -121,10 +119,11 @@ Database verification:
 
 ```bash
 docker-compose up -d
-npm run db:push
+npm run db:migrate
+npm run db:seed
 ```
 
-The project currently uses `db:push`. Generating migrations is a TODO.
+Use `npm run db:push` only for development schema prototyping. Normal setup should use generated migrations in `drizzle/`.
 
 ## Known Local Notes
 

@@ -22,10 +22,11 @@ A local single-user AI story writing app with chapter drafting, co-writer revisi
    docker-compose up -d
    ```
 
-4. Push the schema:
+4. Run migrations:
 
    ```bash
-   npm run db:push
+   npm run db:migrate
+   npm run db:seed
    ```
 
 5. Run the app:
@@ -40,6 +41,7 @@ Open http://localhost:3000.
 
 - The app uses OpenRouter for drafting, revision, structured memory extraction, story bible merging, and embeddings.
 - Without an `OPENROUTER_API_KEY`, server routes fall back to deterministic local text so the product flow remains testable.
+- `npm run db:push` remains available for local schema prototyping; normal setup should use generated migrations.
 - The UI is based on the attached Stitch designs: paper-first writing canvas, charcoal navigation, teal AI states, and compact continuity cards.
 
 ## Project Context For Future Sessions

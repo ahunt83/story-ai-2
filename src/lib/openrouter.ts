@@ -12,6 +12,24 @@ type JsonSchemaFormat = {
   schema: Record<string, unknown>;
 };
 
+export type OpenRouterUsage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+};
+
+export class OpenRouterRequestError extends Error {
+  status: number;
+  providerMessage: string;
+
+  constructor(status: number, providerMessage: string) {
+    super(describeOpenRouterError(status, providerMessage));
+    this.name = "OpenRouterRequestError";
+    this.status = status;
+    this.providerMessage = providerMessage;
+  }
+}
+
 async function openRouterFetch(path: string, body: Record<string, unknown>) {
   if (!env.openRouterApiKey) {
     throw new Error("OPENROUTER_API_KEY is not configured");
@@ -30,10 +48,41 @@ async function openRouterFetch(path: string, body: Record<string, unknown>) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`OpenRouter request failed (${response.status}): ${text}`);
+    throw new OpenRouterRequestError(response.status, text);
   }
 
   return response.json() as Promise<Record<string, unknown>>;
+}
+
+function describeOpenRouterError(status: number, text: string) {
+  const lower = text.toLowerCase();
+
+  if (status === 401 || status === 403) {
+    return "OpenRouter authentication failed. Check OPENROUTER_API_KEY in .env.local.";
+  }
+
+  if (status === 402 || lower.includes("credit") || lower.includes("balance")) {
+    return "OpenRouter reported insufficient credits or balance for this request.";
+  }
+
+  if (status === 429 || lower.includes("rate limit")) {
+    return "OpenRouter rate limit reached. Wait briefly or choose a less constrained model.";
+  }
+
+  if (lower.includes("response_format") || lower.includes("json_schema") || lower.includes("structured")) {
+    return "The selected extraction model does not appear to support structured JSON output. Set OPENROUTER_EXTRACT_MODEL to a model with json_schema support.";
+  }
+
+  return `OpenRouter request failed (${status}). ${text.slice(0, 500)}`;
+}
+
+function usageFrom(json: Record<string, unknown>): OpenRouterUsage | undefined {
+  const usage = json.usage;
+  if (!usage || typeof usage !== "object") {
+    return undefined;
+  }
+
+  return usage as OpenRouterUsage;
 }
 
 export async function completeText(params: {
@@ -43,8 +92,19 @@ export async function completeText(params: {
   maxTokens?: number;
   fallback: string;
 }) {
+  const result = await completeTextWithMetadata(params);
+  return result.content;
+}
+
+export async function completeTextWithMetadata(params: {
+  model?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  fallback: string;
+}) {
   if (!env.openRouterApiKey) {
-    return params.fallback;
+    return { content: params.fallback, usage: undefined, fallbackUsed: true };
   }
 
   const json = await openRouterFetch("/chat/completions", {
@@ -55,7 +115,11 @@ export async function completeText(params: {
   });
 
   const choices = json.choices as Array<{ message?: { content?: string } }> | undefined;
-  return choices?.[0]?.message?.content ?? params.fallback;
+  return {
+    content: choices?.[0]?.message?.content ?? params.fallback,
+    usage: usageFrom(json),
+    fallbackUsed: !choices?.[0]?.message?.content
+  };
 }
 
 export async function completeJson<T>(params: {
@@ -90,7 +154,7 @@ export async function completeJson<T>(params: {
   const parsedUnknown = JSON.parse(raw);
   const parsed = params.schema.parse(parsedUnknown);
 
-  return { parsed, raw, repaired: false };
+  return { parsed, raw, repaired: false, usage: usageFrom(json) };
 }
 
 export async function createEmbeddings(input: string[]) {

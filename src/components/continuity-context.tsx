@@ -1,11 +1,41 @@
+"use client";
+
 import { AlertTriangle, Brain, MessageCircle, Pin, Send, WandSparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { Button, ImportancePill, MemoryCard, SectionHeading } from "@/components/ui";
+import { apiFetch } from "@/lib/client-api";
 import { sampleContext } from "@/lib/sample-data";
+import type { ChapterContext } from "@/lib/story-memory/schema";
 
-export function ContinuityContextPanel({ coWriter = false, actionResult }: { coWriter?: boolean; actionResult?: string }) {
+export function ContinuityContextPanel({
+  coWriter = false,
+  chapterId,
+  actionResult
+}: {
+  coWriter?: boolean;
+  chapterId?: string;
+  actionResult?: string;
+}) {
+  const [context, setContext] = useState<ChapterContext>(sampleContext);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!chapterId) {
+      setContext(sampleContext);
+      return;
+    }
+
+    apiFetch<{ context: ChapterContext }>(`/api/chapters/${chapterId}/context?limit=8`)
+      .then((response) => {
+        setContext(response.context);
+        setError(null);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, [chapterId]);
+
   return (
-    <aside className="w-full border-l border-outline-variant bg-surface-container-low p-6 lg:w-80 lg:overflow-y-auto">
+    <section className="w-full">
       {coWriter ? <CoWriterCard /> : null}
 
       {actionResult ? (
@@ -16,42 +46,51 @@ export function ContinuityContextPanel({ coWriter = false, actionResult }: { coW
       ) : null}
 
       <SectionHeading icon={<Brain size={16} />} title="Continuity Context" />
+      {error ? <p className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{error}</p> : null}
       <div className="space-y-3">
-        {sampleContext.relevantMemoryItems.map((item) => (
+        {context.relevantMemoryItems.length > 0 ? context.relevantMemoryItems.map((item) => (
           <MemoryCard
             key={item.id}
             title={item.label}
             importance={item.importance}
-            meta={`${item.sourceChapterNumber ? `Chapter ${item.sourceChapterNumber}` : "Story Bible"}${item.similarity ? ` · ${Math.round(item.similarity * 100)}% match` : ""}`}
+            meta={`${item.sourceChapterNumber ? `Chapter ${item.sourceChapterNumber}` : "Story Bible"}${item.similarity ? ` / ${Math.round(item.similarity * 100)}% match` : ""}`}
           >
             <p>{item.content}</p>
             {item.evidenceOrBasis ? <p className="mt-2 italic">Evidence: {item.evidenceOrBasis}</p> : null}
           </MemoryCard>
-        ))}
+        )) : <p className="rounded-md border border-dashed border-outline-variant p-4 text-sm text-on-surface-variant">No semantic memory matches yet.</p>}
       </div>
 
       <div className="mt-8">
         <SectionHeading icon={<Pin size={15} />} title="Open Threads" />
         <div className="space-y-3">
-          {sampleContext.openThreads.map((thread) => (
+          {context.openThreads.length > 0 ? context.openThreads.map((thread) => (
             <MemoryCard key={thread.thread} title={thread.thread} importance={thread.importance} meta={thread.status}>
               <p>{thread.futureRelevance}</p>
             </MemoryCard>
-          ))}
+          )) : <p className="rounded-md border border-dashed border-outline-variant p-4 text-sm text-on-surface-variant">No open threads in context.</p>}
         </div>
       </div>
 
-      <div className="mt-8 rounded-md border border-intelligence-teal/30 bg-white p-4">
-        <div className="mb-2 flex items-center gap-2 text-intelligence-teal">
-          <AlertTriangle size={16} />
-          <span className="ui-label">Memory Sync</span>
+      <div className="mt-8">
+        <SectionHeading icon={<AlertTriangle size={16} />} title="Context Package" />
+        <div className="space-y-3 text-sm text-on-surface-variant">
+          {context.previousLongSummary ? <PackageLine label="Previous long summary" value={context.previousLongSummary} /> : null}
+          {context.recentMediumSummaries.map((summary) => <PackageLine key={summary.chapterNumber} label={`Chapter ${summary.chapterNumber} medium`} value={summary.summary} />)}
+          {context.olderShortSummaries.slice(0, 3).map((summary) => <PackageLine key={summary.chapterNumber} label={`Chapter ${summary.chapterNumber} short`} value={summary.summary} />)}
+          {context.criticalFacts.slice(0, 4).map((fact) => <PackageLine key={fact.fact} label="Critical fact" value={fact.fact} />)}
         </div>
-        <div className="h-1 overflow-hidden rounded-full bg-surface-container">
-          <div className="h-full w-3/4 animate-pulse bg-intelligence-teal" />
-        </div>
-        <p className="mt-3 text-xs leading-5 text-on-surface-variant">Context package combines chapter summaries, critical facts, open threads, and semantic memory matches.</p>
       </div>
-    </aside>
+    </section>
+  );
+}
+
+function PackageLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-memory-border bg-white p-3">
+      <p className="text-xs font-bold uppercase text-intelligence-teal">{label}</p>
+      <p className="mt-1 line-clamp-4 leading-6">{value}</p>
+    </div>
   );
 }
 

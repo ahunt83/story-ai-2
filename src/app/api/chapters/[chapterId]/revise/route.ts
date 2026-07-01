@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { aiMessages, draftVersions, scenes } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
 import { createId } from "@/lib/ids";
-import { reviseDraft } from "@/lib/story-memory/ai";
+import { OpenRouterRequestError } from "@/lib/openrouter";
+import { reviseDraftRun } from "@/lib/story-memory/ai";
 import { buildContextForChapter } from "@/lib/story-memory/context";
 import { createMockContext } from "@/lib/story-memory/mock";
 import { loadChapterBundle } from "../helpers";
@@ -34,11 +35,30 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       query: input.command
     }).catch(() => createMockContext());
 
-    const revisedDraft = await reviseDraft({
-      currentDraft: targetScene.draftText,
-      command: input.command,
-      context: chapterContext
-    });
+    let run: Awaited<ReturnType<typeof reviseDraftRun>>;
+    try {
+      run = await reviseDraftRun({
+        currentDraft: targetScene.draftText,
+        command: input.command,
+        context: chapterContext
+      });
+    } catch (error) {
+      await db.insert(aiMessages).values({
+        id: createId("msg"),
+        storyId: bundle.story.id,
+        chapterId,
+        role: "assistant",
+        content: error instanceof Error ? error.message : "Revision failed",
+        metadata: {
+          status: "failed",
+          kind: "revise",
+          providerStatus: error instanceof OpenRouterRequestError ? error.status : undefined
+        }
+      });
+      throw error;
+    }
+
+    const revisedDraft = run.content;
 
     await db.transaction(async (tx) => {
       await tx.insert(draftVersions).values({
@@ -53,7 +73,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       await tx.update(scenes).set({ draftText: revisedDraft, updatedAt: new Date() }).where(eq(scenes.id, targetScene.id));
       await tx.insert(aiMessages).values([
         { id: createId("msg"), storyId: bundle.story.id, chapterId, role: "user", content: input.command },
-        { id: createId("msg"), storyId: bundle.story.id, chapterId, role: "assistant", content: revisedDraft }
+        { id: createId("msg"), storyId: bundle.story.id, chapterId, role: "assistant", content: revisedDraft, metadata: { kind: "revise", usage: run.usage, fallbackUsed: run.fallbackUsed } }
       ]);
     });
 

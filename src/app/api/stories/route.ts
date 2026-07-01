@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -15,7 +15,7 @@ const createStorySchema = z.object({
 
 export async function GET() {
   try {
-    const rows = await db.select().from(stories).where(eq(stories.status, "active"));
+    const rows = await db.select().from(stories).where(eq(stories.status, "active")).orderBy(desc(stories.updatedAt));
     return ok({ stories: rows });
   } catch (error) {
     return fail(error);

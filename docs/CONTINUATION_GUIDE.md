@@ -28,11 +28,13 @@ Built and verified:
 - OpenRouter adapter for generation, revision, extraction, story bible merge, and embeddings.
 - Deterministic local AI fallbacks when `OPENROUTER_API_KEY` is empty.
 - Library screen with live story loading and story creation modal.
-- Writing screen with live draft generation.
-- Co-writer screen with live revision.
+- Writing screen with chapter/scene navigation, editable manuscript canvas, autosave, live draft generation, and manual snapshots.
+- Co-writer screen with selected-scene revision and draft version history restore.
 - Memory Check and Suggest Next Beat API actions.
-- Memory extraction approval screen that can run extraction and commit memory.
-- Story Bible screen exists but still mostly displays sample data.
+- Memory extraction approval screen that can run extraction, edit/toggle/validate memory, and commit approved memory.
+- Story Bible screen reads live `story_bibles` and normalized `memory_items` with tabs/search/filtering.
+- Context preview panel reads the same context endpoint used by generation and Memory Check.
+- Generated Drizzle migration files and `db:migrate`/`db:seed` scripts.
 - Unit tests and Playwright smoke tests.
 
 Last known verification:
@@ -53,7 +55,8 @@ Typical setup:
 npm install
 cp .env.example .env.local
 docker-compose up -d
-npm run db:push
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
@@ -87,16 +90,16 @@ Use this rule before final handoff: if a future session would need to know it, w
 - Keep the app local single-user until explicitly asked otherwise.
 - Prefer Postgres JSONB for full memories and normalized `memory_items` for retrieval.
 - Keep deterministic no-key AI fallbacks so development and tests do not require OpenRouter.
-- Do not remove sample display data until the corresponding live empty states are good.
+- Keep sample display data for useful no-story/no-memory empty states.
 - Preserve the attached design direction: paper-first writing, charcoal system navigation, teal AI/memory accents, serif manuscript text.
 - Add tests with each substantial workflow change.
 
 ## Recommended Next Work
 
-The strongest next slice is:
+The strongest next slice is production hardening:
 
-1. Make the Story Bible screen read real `story_bibles` and `memory_items`.
-2. Make Memory Approval items editable/toggleable before commit.
-3. Add live workflow Playwright coverage that creates a story, generates, revises, extracts, commits, and verifies the Story Bible.
+1. Add streaming generation/revision responses.
+2. Add full Playwright workflow coverage for create, edit, autosave reload, version restore, extract, approve, commit, and Story Bible verification.
+3. Exercise migrations against a clean database in CI/deployment setup.
 
 See `TODO.md` for detailed implementation steps and acceptance criteria.

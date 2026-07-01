@@ -9,6 +9,9 @@ export async function buildContextForChapter(params: {
   storyId: string;
   targetChapterNumber: number;
   query?: string;
+  characters?: string[];
+  categories?: string[];
+  limit?: number;
 }): Promise<ChapterContext> {
   const [bibleRecord] = await db
     .select()
@@ -39,7 +42,10 @@ export async function buildContextForChapter(params: {
   const relevantMemoryItems = await findRelevantMemoryItems({
     storyId: params.storyId,
     query: params.query,
-    fallbackCategories: ["canon_fact", "character_state", "open_thread", "continuity_warning"]
+    characters: params.characters,
+    categories: params.categories,
+    limit: params.limit ?? 12,
+    fallbackCategories: params.categories?.length ? params.categories : ["canon_fact", "character_state", "open_thread", "continuity_warning"]
   });
 
   return {
@@ -75,8 +81,21 @@ function getSummary(memory: unknown, key: "longSummary" | "mediumSummary" | "sho
 async function findRelevantMemoryItems(params: {
   storyId: string;
   query?: string;
+  characters?: string[];
+  categories?: string[];
+  limit: number;
   fallbackCategories: string[];
 }) {
+  const categoryFilter = params.categories?.filter((category) =>
+    memoryItems.category.enumValues.includes(category as typeof memoryItems.category.enumValues[number])
+  ) as Array<typeof memoryItems.category.enumValues[number]> | undefined;
+  const characterFilter = params.characters?.map((character) => character.trim()).filter(Boolean);
+  const filters = [
+    eq(memoryItems.storyId, params.storyId),
+    categoryFilter?.length ? inArray(memoryItems.category, categoryFilter) : undefined,
+    characterFilter?.length ? inArray(memoryItems.label, characterFilter) : undefined
+  ].filter(Boolean);
+
   if (params.query) {
     const [embedding] = await createEmbeddings([params.query]);
     if (embedding) {
@@ -92,11 +111,11 @@ async function findRelevantMemoryItems(params: {
           similarity: memorySimilarity(embedding)
         })
         .from(memoryItems)
-        .where(eq(memoryItems.storyId, params.storyId))
+        .where(and(...filters))
         .orderBy(sql`${memoryItems.embedding} <=> ${JSON.stringify(embedding)}::vector`)
-        .limit(12);
+        .limit(Math.max(params.limit * 4, params.limit));
 
-      return rows.map((row) => ({
+      return rankMemoryRows(rows).slice(0, params.limit).map((row) => ({
         ...row,
         evidenceOrBasis: row.evidenceOrBasis ?? undefined,
         sourceChapterNumber: row.sourceChapterNumber ?? undefined,
@@ -117,15 +136,31 @@ async function findRelevantMemoryItems(params: {
     })
     .from(memoryItems)
     .where(and(
-      eq(memoryItems.storyId, params.storyId),
+      ...filters,
       inArray(memoryItems.category, params.fallbackCategories as Array<typeof memoryItems.category.enumValues[number]>)
     ))
     .orderBy(desc(memoryItems.createdAt))
-    .limit(12);
+    .limit(Math.max(params.limit * 2, params.limit));
 
-  return rows.map((row) => ({
+  return rankMemoryRows(rows).slice(0, params.limit).map((row) => ({
     ...row,
     evidenceOrBasis: row.evidenceOrBasis ?? undefined,
     sourceChapterNumber: row.sourceChapterNumber ?? undefined
   }));
+}
+
+function rankMemoryRows<T extends { importance: string; category: string; similarity?: number }>(rows: T[]) {
+  const importanceScore: Record<string, number> = { critical: 30, major: 15, minor: 0 };
+  const categoryScore: Record<string, number> = {
+    open_thread: 12,
+    continuity_warning: 10,
+    canon_fact: 8,
+    character_state: 6
+  };
+
+  return [...rows].sort((a, b) => {
+    const aScore = (a.similarity ?? 0) * 100 + (importanceScore[a.importance] ?? 0) + (categoryScore[a.category] ?? 0);
+    const bScore = (b.similarity ?? 0) * 100 + (importanceScore[b.importance] ?? 0) + (categoryScore[b.category] ?? 0);
+    return bScore - aScore;
+  });
 }

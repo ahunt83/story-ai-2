@@ -7,15 +7,25 @@ export async function GET(request: Request, context: { params: Promise<{ chapter
     const { chapterId } = await context.params;
     const url = new URL(request.url);
     const query = url.searchParams.get("query") ?? undefined;
+    const characters = splitList(url.searchParams.get("characters"));
+    const categories = splitList(url.searchParams.get("categories"));
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 12), 1), 30);
     const bundle = await loadChapterBundle(chapterId);
     const chapterContext = await buildContextForChapter({
       storyId: bundle.story.id,
       targetChapterNumber: bundle.chapter.chapterNumber,
-      query
+      query,
+      characters,
+      categories,
+      limit
     });
 
     return ok({ context: chapterContext });
   } catch (error) {
     return fail(error);
   }
+}
+
+function splitList(value: string | null) {
+  return value?.split(",").map((item) => item.trim()).filter(Boolean);
 }

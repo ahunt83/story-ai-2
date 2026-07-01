@@ -7,11 +7,17 @@ import { cn } from "@/lib/utils";
 export function WritingCanvas({
   mode = "draft",
   title,
-  text
+  text,
+  editable = false,
+  onChange,
+  saveStatus
 }: {
   mode?: "draft" | "cowriter" | "readonly";
   title?: string;
   text?: string;
+  editable?: boolean;
+  onChange?: (value: string) => void;
+  saveStatus?: "saved" | "saving" | "unsaved" | "failed";
 }) {
   const displayText = text?.trim() ? text : sampleChapterText;
   const displayTitle = title ?? (mode === "cowriter" ? "Collaborative Draft: Chapter 4" : "Chapter 4: The Shattered Mirror");
@@ -29,7 +35,9 @@ export function WritingCanvas({
         <h2 className="headline-serif mb-8 border-b border-memory-border pb-5 text-3xl italic text-primary md:text-[40px]">
           {displayTitle}
         </h2>
-        {mode === "cowriter" && !text ? <CoWriterProse /> : <Prose text={displayText} />}
+        {editable ? (
+          <EditableProse text={displayText} onChange={onChange} saveStatus={saveStatus} />
+        ) : mode === "cowriter" && !text ? <CoWriterProse /> : <Prose text={displayText} />}
         {mode === "cowriter" ? (
           <div className="sticky bottom-6 mt-16 flex justify-center gap-3">
             <Button variant="teal" className="rounded-full shadow-lg"><CheckCircle size={17} />Accept All</Button>
@@ -38,6 +46,41 @@ export function WritingCanvas({
         ) : null}
       </article>
     </section>
+  );
+}
+
+function EditableProse({
+  text,
+  onChange,
+  saveStatus = "saved"
+}: {
+  text: string;
+  onChange?: (value: string) => void;
+  saveStatus?: "saved" | "saving" | "unsaved" | "failed";
+}) {
+  const statusLabel = {
+    saved: "Saved",
+    saving: "Saving...",
+    unsaved: "Unsaved",
+    failed: "Save failed"
+  }[saveStatus];
+
+  return (
+    <div>
+      <div className={cn(
+        "mb-3 text-right text-xs font-bold",
+        saveStatus === "failed" ? "text-red-700" : "text-on-surface-variant"
+      )}>
+        {statusLabel}
+      </div>
+      <textarea
+        value={text}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="story-prose min-h-[58vh] w-full resize-y rounded-md border border-transparent bg-transparent p-0 text-on-surface outline-none transition focus:border-memory-border focus:bg-white/40 focus:p-4"
+        spellCheck
+        aria-label="Scene draft text"
+      />
+    </div>
   );
 }
 
