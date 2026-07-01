@@ -5,9 +5,10 @@ export class ClientApiError extends Error {
 }
 
 export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
   const response = await fetch(url, {
     ...init,
-    headers: {
+    headers: isFormData ? init?.headers : {
       "Content-Type": "application/json",
       ...init?.headers
     }

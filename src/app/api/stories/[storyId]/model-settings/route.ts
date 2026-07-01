@@ -13,6 +13,8 @@ const patchSettingsSchema = z.object({
   revisionModel: z.string().min(1).optional(),
   extractionModel: z.string().min(1).optional(),
   embeddingModel: z.string().min(1).optional(),
+  imageModel: z.string().min(1).optional(),
+  visionModel: z.string().min(1).optional(),
   generationTemperature: z.number().min(0).max(2).optional(),
   revisionTemperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().min(256).max(32000).optional()

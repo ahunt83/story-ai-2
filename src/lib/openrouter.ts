@@ -4,7 +4,14 @@ import { env } from "@/lib/env";
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | Array<{
+    type: "text";
+    text: string;
+  } | {
+    type: "image_url";
+    image_url?: { url: string };
+    imageUrl?: { url: string };
+  }>;
 };
 
 type JsonSchemaFormat = {
@@ -16,6 +23,12 @@ export type OpenRouterUsage = {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  cost?: number;
+};
+
+export type OpenRouterGeneratedImage = {
+  b64Json: string;
+  mediaType: string;
 };
 
 export type OpenRouterTextStreamEvent =
@@ -303,6 +316,80 @@ export async function completeJson<T>(params: {
   const parsed = params.schema.parse(parsedUnknown);
 
   return { parsed, raw, repaired: false, usage: usageFrom(json) };
+}
+
+export async function generateImagesWithModel(params: {
+  model: string;
+  prompt: string;
+  negativePrompt?: string;
+  n?: number;
+  aspectRatio?: string;
+  size?: string;
+  quality?: string;
+  outputFormat?: string;
+  seed?: number;
+  inputReferences?: Array<{ type: "image_url"; image_url: { url: string } }>;
+  fallbackPrompt?: string;
+}) {
+  if (!env.openRouterApiKey) {
+    return {
+      images: [{
+        b64Json: Buffer.from(fallbackSvg(params.fallbackPrompt ?? params.prompt)).toString("base64"),
+        mediaType: "image/svg+xml"
+      }],
+      usage: undefined,
+      fallbackUsed: true
+    };
+  }
+
+  const json = await openRouterFetch("/images", {
+    model: params.model,
+    prompt: params.negativePrompt ? `${params.prompt}\n\nAvoid: ${params.negativePrompt}` : params.prompt,
+    n: params.n ?? 1,
+    aspect_ratio: params.aspectRatio,
+    size: params.size,
+    quality: params.quality,
+    output_format: params.outputFormat,
+    seed: params.seed,
+    input_references: params.inputReferences
+  });
+
+  const data = json.data as Array<{ b64_json?: string; media_type?: string }> | undefined;
+  return {
+    images: (data ?? []).flatMap((image) => image.b64_json ? [{
+      b64Json: image.b64_json,
+      mediaType: image.media_type ?? "image/png"
+    }] : []),
+    usage: usageFrom(json),
+    fallbackUsed: false
+  };
+}
+
+function fallbackSvg(prompt: string) {
+  const escaped = prompt.replace(/[<>&"]/g, (char) => ({
+    "<": "&lt;",
+    ">": "&gt;",
+    "&": "&amp;",
+    "\"": "&quot;"
+  })[char] ?? char);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1365" viewBox="0 0 1024 1365">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#101817"/>
+      <stop offset="0.55" stop-color="#1f2322"/>
+      <stop offset="1" stop-color="#0d0d0d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1365" fill="url(#bg)"/>
+  <rect x="72" y="72" width="880" height="1221" fill="none" stroke="#66d9cc" stroke-opacity="0.35" stroke-width="4"/>
+  <circle cx="512" cy="430" r="156" fill="#66d9cc" fill-opacity="0.14"/>
+  <path d="M320 1110c36-220 96-340 192-340s156 120 192 340" fill="#e1c198" fill-opacity="0.12" stroke="#e1c198" stroke-opacity="0.45" stroke-width="5"/>
+  <text x="512" y="665" fill="#e5e2e1" font-family="Georgia, serif" font-size="46" text-anchor="middle">Character Study</text>
+  <foreignObject x="132" y="735" width="760" height="360">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="color:#bcc9c6;font-family:Georgia,serif;font-size:30px;line-height:1.35;text-align:center">${escaped}</div>
+  </foreignObject>
+</svg>`;
 }
 
 export async function createEmbeddings(input: string[]) {

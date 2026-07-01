@@ -78,6 +78,7 @@ Rules:
 - Label cautious interpretations as "inferred".
 - Mark ambiguous details as ambiguous instead of resolving them yourself.
 - Extract only details that may matter for future continuity, character behavior, plot payoff, worldbuilding consistency, timeline clarity, or narrative voice.
+- In newCharacterCandidates, identify named or notable characters who are not already established and require user review before becoming canon. Include exact scene evidence and likely duplicate notes.
 - Return valid JSON only.
 
 CHAPTER TEXT:

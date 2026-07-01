@@ -12,6 +12,8 @@ type StoryModelSettings = {
   revisionModel: string;
   extractionModel: string;
   embeddingModel: string;
+  imageModel: string;
+  visionModel: string;
   generationTemperature: number;
   revisionTemperature: number;
   maxTokens: number;
@@ -78,6 +80,8 @@ export function StorySettingsClient() {
           revisionModel: String(form.get("revisionModel") ?? ""),
           extractionModel: String(form.get("extractionModel") ?? ""),
           embeddingModel: String(form.get("embeddingModel") ?? ""),
+          imageModel: String(form.get("imageModel") ?? ""),
+          visionModel: String(form.get("visionModel") ?? ""),
           generationTemperature: Number(form.get("generationTemperature")),
           revisionTemperature: Number(form.get("revisionTemperature")),
           maxTokens: Number(form.get("maxTokens"))
@@ -109,6 +113,8 @@ export function StorySettingsClient() {
             <Field name="revisionModel" label="Revision Model" defaultValue={settings.revisionModel} />
             <Field name="extractionModel" label="Extraction Model" defaultValue={settings.extractionModel} />
             <Field name="embeddingModel" label="Embedding Model" defaultValue={settings.embeddingModel} />
+            <Field name="imageModel" label="Image Model" defaultValue={settings.imageModel} />
+            <Field name="visionModel" label="Vision Model" defaultValue={settings.visionModel} />
             <div className="grid gap-3 md:grid-cols-3">
               <Field name="generationTemperature" label="Generation Temp" defaultValue={String(settings.generationTemperature)} type="number" step="0.1" min="0" max="2" />
               <Field name="revisionTemperature" label="Revision Temp" defaultValue={String(settings.revisionTemperature)} type="number" step="0.1" min="0" max="2" />

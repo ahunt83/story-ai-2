@@ -10,6 +10,8 @@ export type ResolvedStoryModelSettings = {
   revisionModel: string;
   extractionModel: string;
   embeddingModel: string;
+  imageModel: string;
+  visionModel: string;
   generationTemperature: number;
   revisionTemperature: number;
   maxTokens: number;
@@ -20,6 +22,8 @@ export const defaultStoryModelSettings = (): ResolvedStoryModelSettings => ({
   revisionModel: env.openRouterChatModel,
   extractionModel: env.openRouterExtractModel,
   embeddingModel: env.openRouterEmbeddingModel,
+  imageModel: env.openRouterImageModel,
+  visionModel: env.openRouterVisionModel,
   generationTemperature: 0.8,
   revisionTemperature: 0.7,
   maxTokens: 1800
@@ -58,6 +62,8 @@ export async function resolveStoryModelSettings(storyId: string): Promise<Resolv
     revisionModel: settings.revisionModel,
     extractionModel: settings.extractionModel,
     embeddingModel: settings.embeddingModel,
+    imageModel: settings.imageModel,
+    visionModel: settings.visionModel,
     generationTemperature: settings.generationTemperature,
     revisionTemperature: settings.revisionTemperature,
     maxTokens: settings.maxTokens

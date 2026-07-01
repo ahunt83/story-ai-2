@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Edit3, FileText, Loader2, PersonStanding, Sparkles } from "lucide-react";
+import { Check, Edit3, FileText, Loader2, PersonStanding, Sparkles, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -190,6 +190,27 @@ export function ExtractionWorkspace() {
             </section>
 
             <section>
+              <SectionHeading icon={<UserPlus size={16} />} title="New Character Candidates" />
+              <div className="space-y-3">
+                {memory.newCharacterCandidates.length > 0 ? memory.newCharacterCandidates.map((candidate, index) => (
+                  <EditableCard
+                    key={`${candidate.possibleName}-${index}`}
+                    title={candidate.possibleName}
+                    section="newCharacterCandidates"
+                    index={index}
+                    included={isIncluded(inclusions, "newCharacterCandidates", index)}
+                    importance="major"
+                    onToggle={toggle}
+                  >
+                    <LabeledInput label="Name" value={candidate.possibleName} onChange={(value) => updateArrayItem("newCharacterCandidates", index, (item) => ({ ...item, possibleName: value }))} />
+                    <LabeledTextarea label="Reason" value={candidate.reasonForExtraction} onChange={(value) => updateArrayItem("newCharacterCandidates", index, (item) => ({ ...item, reasonForExtraction: value }))} />
+                    <LabeledTextarea label="Evidence" value={JSON.stringify(candidate.sceneEvidence, null, 2)} onChange={(value) => updateArrayItem("newCharacterCandidates", index, (item) => ({ ...item, sceneEvidence: safeJson(value) }))} />
+                  </EditableCard>
+                )) : <EmptyMemory label="No new character candidates detected yet." />}
+              </div>
+            </section>
+
+            <section>
               <SectionHeading icon={<PersonStanding size={16} />} title="Character States" />
               <div className="space-y-3">
                 {memory.characterStates.length > 0 ? memory.characterStates.map((character, index) => (
@@ -363,8 +384,8 @@ function EditableCard({
   importance: Importance;
   persistence?: Persistence;
   onToggle: (section: ReviewableSection, index: number) => void;
-  onImportance: (importance: Importance) => void;
-  onPersistence: (persistence: Persistence) => void;
+  onImportance?: (importance: Importance) => void;
+  onPersistence?: (persistence: Persistence) => void;
   children: ReactNode;
 }) {
   return (
@@ -379,20 +400,26 @@ function EditableCard({
           Include
         </label>
       </div>
-      <div className="mb-3 grid gap-3 sm:grid-cols-2">
-        <label className="text-xs font-bold uppercase text-on-surface-variant">
-          Importance
-          <select value={importance} onChange={(event) => onImportance(event.target.value as Importance)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal">
-            {importanceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </label>
-        <label className="text-xs font-bold uppercase text-on-surface-variant">
-          Persistence
-          <select value={persistence ?? "unclear"} onChange={(event) => onPersistence(event.target.value as Persistence)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal">
-            {persistenceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </label>
-      </div>
+      {onImportance || onPersistence ? (
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+          {onImportance ? (
+            <label className="text-xs font-bold uppercase text-on-surface-variant">
+              Importance
+              <select value={importance} onChange={(event) => onImportance(event.target.value as Importance)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal">
+                {importanceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+          ) : null}
+          {onPersistence ? (
+            <label className="text-xs font-bold uppercase text-on-surface-variant">
+              Persistence
+              <select value={persistence ?? "unclear"} onChange={(event) => onPersistence(event.target.value as Persistence)} className="mt-1 w-full rounded-md border border-outline-variant px-3 py-2 text-sm normal-case text-on-surface outline-none focus:border-intelligence-teal">
+                {persistenceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
       <div className="space-y-3">{children}</div>
     </div>
   );
@@ -418,4 +445,13 @@ function LabeledTextarea({ label, value, onChange }: { label: string; value: str
 
 function lines(value: string) {
   return value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+function safeJson(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
 }

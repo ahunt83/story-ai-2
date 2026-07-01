@@ -96,7 +96,8 @@ export function createMockChapterMemory(chapterText: string, chapterNumber = 1, 
         persistence: "permanent"
       }
     ],
-    uncertaintiesOrAmbiguities: []
+    uncertaintiesOrAmbiguities: [],
+    newCharacterCandidates: []
   };
 }
 
@@ -134,6 +135,7 @@ export function createMockContext(): ChapterContext {
         evidenceOrBasis: "local fallback"
       }
     ],
+    charactersForThisChapter: [],
     openThreads: [],
     styleAndVoice: {
       narrativePerson: "third",

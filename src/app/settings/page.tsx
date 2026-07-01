@@ -16,8 +16,12 @@ export default async function SettingsPage() {
   const rows = [
     ["Chat model", env.openRouterChatModel],
     ["Extraction model", env.openRouterExtractModel],
+    ["Image model", env.openRouterImageModel],
+    ["Vision model", env.openRouterVisionModel],
     ["Embedding model", env.openRouterEmbeddingModel],
     ["Embedding dimensions", String(env.openRouterEmbeddingDimensions)],
+    ["Asset storage", env.assetStorageDriver],
+    ["Local asset root", env.localAssetRoot],
     ["API key", env.openRouterApiKey ? "Configured" : "Missing"]
   ];
 

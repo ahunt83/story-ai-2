@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { characterContextCardSchema, newCharacterCandidateSchema } from "@/lib/characters/schema";
 import { storyFoundationContextSchema } from "@/lib/story-foundation/schema";
 
 export const importanceSchema = z.enum(["critical", "major", "minor"]);
@@ -191,7 +192,8 @@ export const chapterMemorySchema = z.object({
   styleAndVoice: styleAndVoiceMemorySchema,
   continuityWarnings: z.array(continuityWarningSchema),
   doNotForget: z.array(doNotForgetItemSchema),
-  uncertaintiesOrAmbiguities: z.array(ambiguityItemSchema)
+  uncertaintiesOrAmbiguities: z.array(ambiguityItemSchema),
+  newCharacterCandidates: z.array(newCharacterCandidateSchema).default([])
 });
 
 export const storyBibleSchema = z.object({
@@ -225,6 +227,7 @@ export const chapterContextSchema = z.object({
     sourceChapterNumber: z.number().optional(),
     similarity: z.number().optional()
   })),
+  charactersForThisChapter: z.array(characterContextCardSchema).default([]),
   openThreads: z.array(storyThreadSchema),
   styleAndVoice: styleAndVoiceMemorySchema.optional()
 });

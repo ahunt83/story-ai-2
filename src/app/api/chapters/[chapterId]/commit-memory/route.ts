@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { chapterMemories, chapters, memoryItems, storyBibles } from "@/db/schema";
+import { characterCandidates, chapterMemories, chapters, memoryItems, storyBibles } from "@/db/schema";
 import { startAiRun } from "@/lib/ai-runs";
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
@@ -114,6 +114,7 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
       });
 
       await tx.delete(memoryItems).where(eq(memoryItems.chapterMemoryId, memoryId));
+      await tx.delete(characterCandidates).where(eq(characterCandidates.chapterMemoryId, memoryId));
 
       if (normalized.length > 0) {
         await tx.insert(memoryItems).values(normalized.map((item, index) => ({
@@ -131,6 +132,19 @@ export async function POST(request: Request, context: { params: Promise<{ chapte
           payload: item.payload,
           embedding: embeddings[index]
         })));
+      }
+
+      if (memory.newCharacterCandidates.length > 0) {
+        await tx.insert(characterCandidates).values(memory.newCharacterCandidates.map((candidate) => ({
+          id: candidate.candidateId || createId("candidate"),
+          storyId: bundle.story.id,
+          chapterId,
+          chapterMemoryId: memoryId,
+          possibleName: candidate.possibleName,
+          confidence: candidate.confidence,
+          evidence: candidate.sceneEvidence,
+          suggestedProfile: candidate.suggestedCharacterProfile
+        }))).onConflictDoNothing();
       }
 
       await tx.update(chapters).set({

@@ -171,7 +171,8 @@ export const sampleMemory: ChapterMemory = {
     }
   ],
   doNotForget: [],
-  uncertaintiesOrAmbiguities: []
+  uncertaintiesOrAmbiguities: [],
+  newCharacterCandidates: []
 };
 
 export const sampleBible: StoryBible = {
@@ -216,6 +217,7 @@ export const sampleContext: ChapterContext = {
       similarity: 0.87
     }
   ],
+  charactersForThisChapter: [],
   openThreads: sampleMemory.openThreads,
   styleAndVoice: sampleMemory.styleAndVoice
 };
