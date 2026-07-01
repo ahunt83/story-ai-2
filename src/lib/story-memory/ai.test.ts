@@ -1,0 +1,27 @@
+import { describe, expect, it } from "vitest";
+
+import { sampleMemory } from "@/lib/sample-data";
+import { extractChapterMemory, mergeStoryBible } from "./ai";
+
+describe("story-memory AI fallbacks", () => {
+  it("returns valid mock extraction when OpenRouter is not configured", async () => {
+    const result = await extractChapterMemory({
+      chapterText: "A clean chapter text with a mirror and a promise.",
+      chapterNumber: 2,
+      title: "The Promise"
+    });
+
+    expect(result.parsed.chapterMetadata.chapterNumber).toBe(2);
+    expect(result.parsed.summaries.shortSummary).toBeTruthy();
+  });
+
+  it("merges chapter memory into a local story bible fallback", async () => {
+    const result = await mergeStoryBible({
+      existingStoryBible: null,
+      chapterMemory: sampleMemory
+    });
+
+    expect(result.parsed.updatedFromChapterNumber).toBe(sampleMemory.chapterMetadata.chapterNumber);
+    expect(result.parsed.openThreads.length).toBeGreaterThan(0);
+  });
+});
