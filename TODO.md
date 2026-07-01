@@ -4,9 +4,8 @@ This file tracks the remaining work after the initial MVP scaffold and live work
 
 Status after the current build pass:
 
-- Completed: items 1, 2, 3, 4, 5, 6, 7, 8, and 9.
-- Partially completed: item 10. Sidebar navigation preserves live `chapterId`/`storyId` context, and Story Bible can resolve a story from `chapterId`; mobile drawers/sheets and broader polish remain.
-- Still open: item 10 UX/responsive refinement and item 11 later production work.
+- Completed: items 1, 2, 3, 4, 5, 6, 7, 8, 9, and 10.
+- Still open: item 11 later production work.
 
 Recommended build order:
 
@@ -300,35 +299,35 @@ Implementation details:
   - [x] Tests do not depend on OpenRouter network calls.
   - [x] Running smoke/integration tests never changes the user's real local story data.
 
-## 10. UX And Responsive Refinement — Partially Completed
+## 10. UX And Responsive Refinement — Completed
 
-Status: Partially completed. Shared sidebar navigation now preserves `chapterId` or `storyId`, and `/bible?chapterId=...` resolves the matching story. Responsive drawer/sheet refinements and broader loading/error polish remain open.
+Status: Completed. Shared sidebar navigation preserves `chapterId` or `storyId`, `/bible?chapterId=...` resolves the matching story, mobile writing tools use full-screen sheets, and common loading/empty/error states are visible and retryable.
 
 Goal: Make the app feel polished across viewport sizes.
 
 Implementation details:
 
 - Mobile:
-  - Replace stacked side panels with real drawers/sheets.
-  - Context and AI controls should open as full-screen sheets.
-  - Keep editor first.
+  - [x] Replace stacked side panels with real drawers/sheets.
+  - [x] Context and AI controls should open as full-screen sheets.
+  - [x] Keep editor first.
 - Loading/empty states:
-  - Library loading state.
-  - No story state.
-  - No memory state.
-  - AI busy state.
-  - DB/API error state.
+  - [x] Library loading state.
+  - [x] No story state.
+  - [x] No memory state.
+  - [x] AI busy state.
+  - [x] DB/API error state.
 - Navigation:
   - [x] Keep selected story/chapter in URL.
   - [x] Ensure shared sidebar nav links preserve `storyId` or `chapterId` where appropriate.
 - Accessibility:
-  - Ensure all icon buttons have labels.
-  - Ensure modal focus management.
-  - Check color contrast for teal pills and muted text.
+  - [x] Ensure all icon buttons have labels.
+  - [x] Ensure modal focus management.
+  - [x] Check color contrast for teal pills and muted text.
 - Acceptance criteria:
-  - [ ] No major overlap or hidden controls on mobile.
+  - [x] No major overlap or hidden controls on mobile.
   - [x] User can navigate the live story without losing selected chapter.
-  - [ ] Common errors are visible and recoverable.
+  - [x] Common errors are visible and recoverable.
 
 ## 11. Later Production Work — Open
 

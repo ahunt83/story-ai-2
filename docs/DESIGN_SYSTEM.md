@@ -93,8 +93,9 @@ Desktop:
 Tablet/mobile:
 
 - Editor should be primary.
-- Side panels should collapse into drawers/sheets.
-- Mobile implementation is still a TODO; current responsive behavior is serviceable but not final.
+- Writing side panels collapse into full-screen sheets for story structure, history, continuity context, and AI controls.
+- Mobile bottom actions should expose sheets without covering important manuscript content; the writing canvas keeps enough bottom padding for fixed controls.
+- Empty and error states should be visible in place, with retry or library navigation when recovery is possible.
 
 ## Components
 

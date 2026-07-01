@@ -2,7 +2,7 @@
 
 import { ArrowUpRight, BookOpen, FileText, Plus, Search, Sparkles, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { AppShell, SearchBox } from "@/components/app-shell";
 import { Button } from "@/components/ui";
@@ -23,13 +23,40 @@ export function LibraryClient() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    loadStories();
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.setTimeout(() => titleInputRef.current?.focus(), 0);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  function loadStories() {
+    setLoading(true);
+    setError(null);
     apiFetch<{ stories: StoryRow[] }>("/api/stories")
       .then((data) => setStories(data.stories))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }
 
   async function createStory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,7 +93,7 @@ export function LibraryClient() {
     live: true
   })), [stories]);
 
-  const cards = liveCards.length > 0 ? liveCards : sampleStories.map((story) => ({ ...story, live: false }));
+  const cards = !loading && liveCards.length > 0 ? liveCards : sampleStories.map((story) => ({ ...story, live: false }));
 
   return (
     <AppShell
@@ -86,13 +113,18 @@ export function LibraryClient() {
             <p className="mt-2 max-w-2xl text-on-surface-variant">
               {loading ? "Loading your local story library..." : liveCards.length > 0 ? "Live stories from Postgres are ready to write." : "No live stories yet. The cards below are design examples; create one to start the real flow."}
             </p>
-            {error ? <p className="mt-3 text-sm font-bold text-red-700">{error}</p> : null}
+            {error ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">
+                <span>{error}</span>
+                <Button variant="secondary" onClick={loadStories}>Retry</Button>
+              </div>
+            ) : null}
           </div>
           <Button variant="teal" onClick={() => setOpen(true)}><Plus size={18} />Start a New Manuscript</Button>
         </section>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {cards.map((story) => (
+          {loading ? Array.from({ length: 3 }).map((_, index) => <LoadingStoryCard key={index} />) : cards.map((story) => (
             <Link key={story.id} href={story.live ? `/writing?storyId=${story.id}` : "/writing"} className="group rounded-lg border border-memory-border bg-white p-5 transition hover:-translate-y-1 hover:border-intelligence-teal/40">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div className="rounded-md bg-intelligence-glow p-3 text-intelligence-teal">
@@ -136,12 +168,12 @@ export function LibraryClient() {
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4" role="dialog" aria-modal="true" aria-labelledby="new-story-title">
           <form onSubmit={createStory} className="w-full max-w-xl rounded-lg border border-memory-border bg-parchment-base p-6 soft-shadow">
             <div className="mb-6 flex items-start justify-between">
               <div>
                 <p className="ui-label mb-2 text-intelligence-teal">New Story</p>
-                <h2 className="headline-serif text-3xl text-primary">Start a manuscript</h2>
+                <h2 id="new-story-title" className="headline-serif text-3xl text-primary">Start a manuscript</h2>
               </div>
               <button type="button" className="rounded-md p-2 text-on-surface-variant hover:bg-surface-container" onClick={() => setOpen(false)} aria-label="Close">
                 <X size={18} />
@@ -149,7 +181,7 @@ export function LibraryClient() {
             </div>
             <label className="mb-4 block">
               <span className="ui-label mb-2 block text-on-surface-variant">Title</span>
-              <input required name="title" className="w-full rounded-md border border-outline-variant bg-white px-3 py-3 outline-none focus:border-intelligence-teal" placeholder="The Obsidian Echo" />
+              <input ref={titleInputRef} required name="title" className="w-full rounded-md border border-outline-variant bg-white px-3 py-3 outline-none focus:border-intelligence-teal" placeholder="The Obsidian Echo" />
             </label>
             <label className="mb-4 block">
               <span className="ui-label mb-2 block text-on-surface-variant">Initial Prompt</span>
@@ -164,6 +196,27 @@ export function LibraryClient() {
         </div>
       ) : null}
     </AppShell>
+  );
+}
+
+function LoadingStoryCard() {
+  return (
+    <div className="rounded-lg border border-memory-border bg-white p-5" aria-label="Loading story">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="h-12 w-12 animate-pulse rounded-md bg-surface-container" />
+        <div className="h-6 w-16 animate-pulse rounded-full bg-surface-container" />
+      </div>
+      <div className="h-8 w-3/4 animate-pulse rounded bg-surface-container" />
+      <div className="mt-4 space-y-2">
+        <div className="h-4 animate-pulse rounded bg-surface-container" />
+        <div className="h-4 w-5/6 animate-pulse rounded bg-surface-container" />
+        <div className="h-4 w-2/3 animate-pulse rounded bg-surface-container" />
+      </div>
+      <div className="mt-8 h-1.5 animate-pulse rounded-full bg-surface-container" />
+      <div className="mt-5 border-t border-memory-border pt-4">
+        <div className="h-4 w-1/2 animate-pulse rounded bg-surface-container" />
+      </div>
+    </div>
   );
 }
 

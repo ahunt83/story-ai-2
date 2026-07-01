@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button, MemoryCard, SectionHeading } from "@/components/ui";
 import { apiFetch } from "@/lib/client-api";
-import { sampleBible } from "@/lib/sample-data";
 import type { Importance, StoryBible } from "@/lib/story-memory/schema";
 
 type StorySummary = {
@@ -59,6 +58,7 @@ export function StoryBibleWorkspace() {
   const [importance, setImportance] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const tab = tabs.find((item) => item.label === activeTab) ?? tabs[0];
   const category = tab.categories.length === 1 ? tab.categories[0] : "";
@@ -90,7 +90,7 @@ export function StoryBibleWorkspace() {
     }
 
     resolveStory();
-  }, [requestedChapterId, requestedStoryId]);
+  }, [reloadKey, requestedChapterId, requestedStoryId]);
 
   useEffect(() => {
     if (!story?.id) {
@@ -117,12 +117,13 @@ export function StoryBibleWorkspace() {
     }, query ? 250 : 0);
 
     return () => window.clearTimeout(timeout);
-  }, [story?.id, category, importance, query]);
+  }, [reloadKey, story?.id, category, importance, query]);
 
-  const bible = data?.bible ?? sampleBible;
   const rows = data?.memoryItems ?? [];
-  const displayRows = rows.length > 0 ? rows : fallbackRows(activeTab);
-  const character = bible.characters[0] ?? sampleBible.characters[0];
+  const displayRows = hasUsableMemory(data, rows) ? rows : [];
+  const character = data?.characters[0] ?? null;
+  const openThreads = data?.openThreads ?? [];
+  const warnings = data?.warnings ?? [];
   const hasLiveData = Boolean(data?.bible || rows.length > 0);
 
   const contextCopy = useMemo(() => {
@@ -146,10 +147,26 @@ export function StoryBibleWorkspace() {
           <p className="ui-label mb-3 text-intelligence-teal">Story Bible</p>
           <h2 className="headline-serif text-3xl text-primary md:text-[40px]">Continuity Explorer</h2>
           <p className="mt-2 max-w-2xl text-on-surface-variant">{contextCopy}</p>
-          {error ? <p className="mt-3 text-sm font-bold text-red-700">{error}</p> : null}
+          {error ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">
+              <span>{error}</span>
+              <Button variant="secondary" onClick={() => setReloadKey((key) => key + 1)}>Retry</Button>
+            </div>
+          ) : null}
         </section>
 
-        <div className="mb-8 flex gap-6 overflow-x-auto border-b border-outline-variant">
+        {!loading && !story ? (
+          <section className="rounded-md border border-dashed border-outline-variant bg-white p-6 text-center">
+            <p className="ui-label mb-3 text-intelligence-teal">No Story</p>
+            <h3 className="headline-serif text-2xl text-primary">Create a manuscript to build a Story Bible</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
+              Once a chapter has committed memory, characters, threads, locations, and facts will appear here.
+            </p>
+            <Link href="/" className="mt-5 inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">Go to Library</Link>
+          </section>
+        ) : null}
+
+        {story ? <div className="mb-8 flex gap-6 overflow-x-auto border-b border-outline-variant">
           {tabs.map((item) => (
             <button
               key={item.label}
@@ -160,15 +177,15 @@ export function StoryBibleWorkspace() {
               {item.label}
             </button>
           ))}
-        </div>
+        </div> : null}
 
-        <div className="grid gap-6 lg:grid-cols-12">
+        {story ? <div className="grid gap-6 lg:grid-cols-12">
           <aside className="space-y-5 lg:col-span-4">
             <div className="rounded-md border border-memory-border bg-white p-5 soft-shadow">
               <div className="mb-5 aspect-square rounded-md bg-gradient-to-br from-surface-container-low to-intelligence-glow p-6">
                 <div className="flex h-full items-end rounded-md bg-primary-container p-4 text-parchment-base">
                   <div>
-                    <span className="mb-3 inline-block rounded bg-intelligence-teal px-2 py-1 text-[10px] font-bold uppercase text-white">{character?.importance ?? "major"}</span>
+                    <span className="mb-3 inline-block rounded bg-intelligence-teal px-2 py-1 text-[10px] font-bold uppercase text-white">{character?.importance ?? "pending"}</span>
                     <h3 className="headline-serif text-2xl">{character?.name ?? "No Character Yet"}</h3>
                     <p className="text-sm text-on-primary-container">{character?.roleInStory ?? "Commit memory to reveal live character state."}</p>
                   </div>
@@ -185,12 +202,12 @@ export function StoryBibleWorkspace() {
             <div className="rounded-md border border-memory-border bg-white p-5">
               <SectionHeading icon={<Users size={16} />} title="Open Threads" />
               <div className="space-y-3 text-sm text-on-surface-variant">
-                {(bible.openThreads.length > 0 ? bible.openThreads : sampleBible.openThreads).slice(0, 4).map((thread) => (
+                {openThreads.length > 0 ? openThreads.slice(0, 4).map((thread) => (
                   <div key={thread.thread} className="flex items-center justify-between gap-3">
                     <span>{thread.thread}</span>
                     <span className="rounded-full bg-intelligence-glow px-2 py-0.5 text-[11px] font-bold text-intelligence-teal">{thread.importance}</span>
                   </div>
-                ))}
+                )) : <p>No open threads committed yet.</p>}
               </div>
             </div>
           </aside>
@@ -232,7 +249,7 @@ export function StoryBibleWorkspace() {
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed border-outline-variant bg-surface-container-low p-6 text-sm text-on-surface-variant">
-                  No matching memory yet.
+                  {query || importance ? "No matching memory yet." : "No committed memory yet. Run extraction from a chapter, review the results, then commit them to populate this view."}
                 </div>
               )}
             </section>
@@ -240,11 +257,11 @@ export function StoryBibleWorkspace() {
             <section>
               <SectionHeading icon={<AlertTriangle size={16} />} title="Continuity Warnings" />
               <div className="space-y-3">
-                {(data?.warnings.length ? data.warnings : sampleBible.continuityWarnings).map((warning) => (
+                {warnings.length > 0 ? warnings.map((warning) => (
                   <MemoryCard key={warning.warning} title={warning.warning} importance={warning.importance} meta={warning.evidenceOrBasis}>
                     {[warning.possibleContradiction, warning.suggestedHandling].filter(Boolean).join(" ")}
                   </MemoryCard>
-                ))}
+                )) : <div className="rounded-md border border-dashed border-outline-variant bg-surface-container-low p-6 text-sm text-on-surface-variant">No continuity warnings committed yet.</div>}
               </div>
             </section>
 
@@ -256,54 +273,14 @@ export function StoryBibleWorkspace() {
               <p className="text-sm italic text-on-primary-container">{hasLiveData ? "Newly committed chapter memory appears here without restarting the app." : "Run extraction, edit approval items, then commit them to build live memory."}</p>
             </div>
           </section>
-        </div>
+        </div> : null}
       </div>
     </AppShell>
   );
 }
 
-function fallbackRows(activeTab: string): MemoryRow[] {
-  if (activeTab === "Locations") {
-    return sampleBible.importantLocations.map((location) => ({
-      id: location.name,
-      category: "location",
-      label: location.name,
-      content: location.significance,
-      importance: location.importance,
-      evidenceOrBasis: location.evidenceOrBasis
-    }));
-  }
-
-  if (activeTab === "Plot Threads") {
-    return sampleBible.openThreads.map((thread) => ({
-      id: thread.thread,
-      category: "open_thread",
-      label: thread.thread,
-      content: thread.futureRelevance ?? thread.status,
-      importance: thread.importance,
-      evidenceOrBasis: thread.evidenceOrBasis
-    }));
-  }
-
-  if (activeTab === "Characters") {
-    return sampleBible.characters.map((character) => ({
-      id: character.name,
-      category: "character_state",
-      label: character.name,
-      content: [character.statusAtChapterEnd, character.emotionalState].filter(Boolean).join(" "),
-      importance: character.importance,
-      evidenceOrBasis: character.evidenceOrBasis
-    }));
-  }
-
-  return sampleBible.importantObjects.map((object) => ({
-    id: object.name,
-    category: "object",
-    label: object.name,
-    content: object.significance,
-    importance: object.importance,
-    evidenceOrBasis: object.evidenceOrBasis
-  }));
+function hasUsableMemory(data: BibleResponse | null, rows: MemoryRow[]) {
+  return Boolean(data?.bible || rows.length > 0);
 }
 
 function chapterMeta(sourceChapterNumber?: number) {

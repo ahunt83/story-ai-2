@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Brain, History, Loader2, Plus, RotateCcw, Save, WandSparkles } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { BookOpen, Brain, History, Layers, Loader2, Plus, RotateCcw, Save, WandSparkles, X } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import { AiStatus, AppShell, SparkleAction } from "@/components/app-shell";
 import { ContinuityContextPanel } from "@/components/continuity-context";
@@ -58,6 +58,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
   const [actionResult, setActionResult] = useState<string | undefined>();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [mobileSheet, setMobileSheet] = useState<"navigator" | "ai" | "context" | "history" | null>(null);
   const [revisionPreview, setRevisionPreview] = useState<RevisionPreviewState | null>(null);
 
   useEffect(() => {
@@ -369,6 +370,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
     ? <Link href={`/writing/extraction?chapterId=${chapterId}`} className="hidden rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 sm:inline-flex">Extract Memory</Link>
     : <Link href="/" className="hidden rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 sm:inline-flex">Create Story</Link>;
   const draftLocked = busy === "generate" || busy === "revise" || busy === "apply-revision" || Boolean(revisionPreview);
+  const hasLiveChapter = Boolean(bundle && chapterId);
 
   return (
     <AppShell
@@ -388,7 +390,7 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
           <div className="pointer-events-auto" onClick={() => runAssistantAction("suggest-next-beat")}><SparkleAction label="Suggest Next Beat" /></div>
         </div>
 
-        <aside className="order-2 w-full border-r border-outline-variant bg-surface-container-low p-4 lg:order-1 lg:w-80 lg:overflow-y-auto">
+        <aside className="hidden border-r border-outline-variant bg-surface-container-low p-4 lg:order-1 lg:block lg:w-80 lg:overflow-y-auto">
           <Navigator
             chapters={storyChapters}
             scenes={sortedScenes}
@@ -413,6 +415,8 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
           {error ? <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-800">{error}</div> : null}
           {loading ? (
             <div className="flex flex-1 items-center justify-center gap-3 text-on-surface-variant"><Loader2 className="animate-spin" size={20} />Loading chapter...</div>
+          ) : !hasLiveChapter ? (
+            <EmptyWritingState />
           ) : (
             <WritingCanvas
               mode={initialMode}
@@ -429,28 +433,186 @@ export function WritingWorkspace({ initialMode = "draft" }: { initialMode?: "dra
               } : undefined}
             />
           )}
-          <div className="border-t border-outline-variant bg-white p-4 lg:hidden">
-            <LiveControls busy={busy} generate={generate} revise={revise} coWriter={initialMode === "cowriter"} />
-          </div>
         </div>
 
-        <aside className="order-3 w-full border-l border-outline-variant bg-surface-container-low p-6 lg:w-96 lg:overflow-y-auto">
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <Button variant="secondary" onClick={() => setHistoryOpen((open) => !open)} disabled={!bundle}><History size={16} />History</Button>
-            <Button variant="secondary" onClick={saveVersion} disabled={!activeScene || Boolean(busy)}><Save size={16} />Save Version</Button>
-          </div>
-          {historyOpen && bundle ? <VersionDrawer versions={bundle.draftVersions ?? []} activeSceneId={activeSceneId} onRestore={restoreVersion} busy={busy} /> : null}
+        <aside className="hidden border-l border-outline-variant bg-surface-container-low p-6 lg:order-3 lg:block lg:w-96 lg:overflow-y-auto">
+          <HistoryTools
+            open={historyOpen}
+            onToggle={() => setHistoryOpen((open) => !open)}
+            onSave={saveVersion}
+            versions={bundle?.draftVersions ?? []}
+            activeSceneId={activeSceneId}
+            onRestore={restoreVersion}
+            busy={busy}
+            canSave={Boolean(activeScene)}
+            hasBundle={Boolean(bundle)}
+          />
           <LiveControls busy={busy} generate={generate} revise={revise} coWriter={initialMode === "cowriter"} />
           <div className="mt-6">
             <ContinuityContextPanel coWriter={initialMode === "cowriter"} chapterId={chapterId ?? undefined} actionResult={actionResult} />
           </div>
         </aside>
       </div>
-      <div className="fixed bottom-4 right-4 z-30 flex gap-2 lg:hidden">
-        <Button variant="secondary" onClick={() => runAssistantAction("memory-check")}><Brain size={16} />Context</Button>
-        <Button variant="teal" onClick={() => runAssistantAction("suggest-next-beat")}><WandSparkles size={16} />AI</Button>
+
+      <div className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-4 gap-2 rounded-md border border-outline-variant bg-white/95 p-2 shadow-lg backdrop-blur lg:hidden">
+        <Button variant="secondary" className="px-2 text-xs" onClick={() => setMobileSheet("navigator")} disabled={!hasLiveChapter}><Layers size={16} />Story</Button>
+        <Button variant="secondary" className="px-2 text-xs" onClick={() => setMobileSheet("history")} disabled={!hasLiveChapter}><History size={16} />History</Button>
+        <Button variant="secondary" className="px-2 text-xs" onClick={() => setMobileSheet("context")} disabled={!hasLiveChapter}><Brain size={16} />Context</Button>
+        <Button variant="teal" className="px-2 text-xs" onClick={() => setMobileSheet("ai")} disabled={!hasLiveChapter}><WandSparkles size={16} />AI</Button>
       </div>
+
+      <MobileSheet title="Story Structure" open={mobileSheet === "navigator"} onClose={() => setMobileSheet(null)}>
+        <Navigator
+          chapters={storyChapters}
+          scenes={sortedScenes}
+          currentChapterId={chapterId}
+          activeSceneId={activeSceneId}
+          onChapter={(id) => {
+            setRevisionPreview(null);
+            setChapterId(id);
+            setMobileSheet(null);
+            router.push(`/writing?chapterId=${id}`);
+          }}
+          onScene={(id) => {
+            setRevisionPreview(null);
+            setActiveSceneId(id);
+            setMobileSheet(null);
+          }}
+          onNewChapter={createNextChapter}
+          onNewScene={createScene}
+          busy={busy}
+        />
+      </MobileSheet>
+
+      <MobileSheet title="AI Controls" open={mobileSheet === "ai"} onClose={() => setMobileSheet(null)}>
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button variant="secondary" onClick={() => runAssistantAction("memory-check")} disabled={Boolean(busy)}><Brain size={16} />Memory Check</Button>
+          <Button variant="secondary" onClick={() => runAssistantAction("suggest-next-beat")} disabled={Boolean(busy)}><WandSparkles size={16} />Suggest Next Beat</Button>
+        </div>
+        <LiveControls busy={busy} generate={generate} revise={revise} coWriter={initialMode === "cowriter"} />
+        {chapterId ? (
+          <Link href={`/writing/extraction?chapterId=${chapterId}`} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-bold text-on-primary transition hover:opacity-90">
+            <BookOpen size={16} />
+            Extract Memory
+          </Link>
+        ) : null}
+      </MobileSheet>
+
+      <MobileSheet title="Continuity Context" open={mobileSheet === "context"} onClose={() => setMobileSheet(null)}>
+        <ContinuityContextPanel coWriter={initialMode === "cowriter"} chapterId={chapterId ?? undefined} actionResult={actionResult} />
+      </MobileSheet>
+
+      <MobileSheet title="Draft History" open={mobileSheet === "history"} onClose={() => setMobileSheet(null)}>
+        <HistoryTools
+          open
+          onToggle={() => setHistoryOpen(true)}
+          onSave={saveVersion}
+          versions={bundle?.draftVersions ?? []}
+          activeSceneId={activeSceneId}
+          onRestore={restoreVersion}
+          busy={busy}
+          canSave={Boolean(activeScene)}
+          hasBundle={Boolean(bundle)}
+        />
+      </MobileSheet>
     </AppShell>
+  );
+}
+
+function EmptyWritingState() {
+  return (
+    <div className="flex flex-1 items-center justify-center px-5 py-16">
+      <section className="w-full max-w-xl rounded-md border border-dashed border-outline-variant bg-white p-6 text-center">
+        <p className="ui-label mb-3 text-intelligence-teal">No Chapter Selected</p>
+        <h2 className="headline-serif text-3xl text-primary">Open a live manuscript</h2>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-on-surface-variant">
+          Choose a story from the library or start a new one before using the editor, generation tools, and memory workflow.
+        </p>
+        <Link href="/" className="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">
+          <BookOpen size={16} />
+          Go to Library
+        </Link>
+      </section>
+    </div>
+  );
+}
+
+function HistoryTools({
+  open,
+  onToggle,
+  onSave,
+  versions,
+  activeSceneId,
+  onRestore,
+  busy,
+  canSave,
+  hasBundle
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onSave: () => void;
+  versions: Version[];
+  activeSceneId: string | null;
+  onRestore: (versionId: string) => void;
+  busy: string | null;
+  canSave: boolean;
+  hasBundle: boolean;
+}) {
+  return (
+    <>
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        <Button variant="secondary" onClick={onToggle} disabled={!hasBundle}><History size={16} />History</Button>
+        <Button variant="secondary" onClick={onSave} disabled={!canSave || Boolean(busy)}><Save size={16} />Save Version</Button>
+      </div>
+      {open && hasBundle ? <VersionDrawer versions={versions} activeSceneId={activeSceneId} onRestore={onRestore} busy={busy} /> : null}
+    </>
+  );
+}
+
+function MobileSheet({
+  title,
+  open,
+  onClose,
+  children
+}: {
+  title: string;
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/35 lg:hidden" role="dialog" aria-modal="true" aria-labelledby={`mobile-sheet-${title.replace(/\s+/g, "-").toLowerCase()}`}>
+      <div className="flex h-full flex-col bg-surface-container-lowest">
+        <header className="flex items-center justify-between border-b border-outline-variant bg-white px-4 py-3">
+          <h2 id={`mobile-sheet-${title.replace(/\s+/g, "-").toLowerCase()}`} className="headline-serif text-2xl text-primary">{title}</h2>
+          <button type="button" className="rounded-md p-2 text-on-surface-variant hover:bg-surface-container-low" onClick={onClose} aria-label={`Close ${title}`}>
+            <X size={20} />
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto p-4 pb-28">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 

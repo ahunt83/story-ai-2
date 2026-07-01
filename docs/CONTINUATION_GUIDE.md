@@ -38,6 +38,8 @@ Built and verified:
 - Unit tests, Playwright smoke tests, and a guarded full Playwright workflow test for create, generate, revise, extract, commit, and Story Bible verification.
 - Isolated Playwright test database support via the `test-db` Docker Compose service and `TEST_DATABASE_URL`.
 - Shared sidebar navigation preserves live `chapterId`/`storyId` context; Story Bible can resolve `/bible?chapterId=...`.
+- Responsive writing polish: mobile story navigation, draft history, continuity context, and AI controls open as full-screen sheets while the editor remains first.
+- Library and Story Bible now include clearer loading, empty, retryable DB/API error, no-story, and no-memory states.
 
 Last known verification:
 
@@ -107,11 +109,7 @@ Use this rule before final handoff: if a future session would need to know it, w
 
 ## Recommended Next Work
 
-The strongest non-production next slice is responsive and UX polish:
-
-1. Replace stacked mobile side panels with real drawers/sheets for chapter navigation, context, and AI controls.
-2. Broaden loading/empty/error states across Library, Writing, Extraction, and Story Bible.
-3. Add optional API-level integration tests for direct database assertions around extract/commit.
+The local MVP checklist is complete. The strongest next non-production slice is optional API-level integration tests for direct database assertions around story/chapter creation, extract/commit, and memory item persistence.
 
 Production hardening remains tracked separately in `TODO.md`, including deployment/auth/cost-control work.
 
