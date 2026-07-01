@@ -77,6 +77,7 @@ export const stories = pgTable("stories", {
   title: text("title").notNull(),
   initialPrompt: text("initial_prompt").notNull(),
   genreToneNotes: text("genre_tone_notes"),
+  isNsfw: boolean("is_nsfw").notNull().default(false),
   status: text("status").notNull().default("active"),
   ...timestamps
 });
@@ -84,6 +85,7 @@ export const stories = pgTable("stories", {
 export const userPreferences = pgTable("user_preferences", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   themePreference: text("theme_preference").notNull().default("light"),
+  nsfwMode: boolean("nsfw_mode").notNull().default(false),
   ...timestamps
 });
 

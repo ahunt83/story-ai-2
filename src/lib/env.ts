@@ -3,6 +3,9 @@ export const env = {
   openRouterApiKey: process.env.OPENROUTER_API_KEY ?? "",
   openRouterChatModel: process.env.OPENROUTER_CHAT_MODEL ?? "anthropic/claude-sonnet-4.5",
   openRouterExtractModel: process.env.OPENROUTER_EXTRACT_MODEL ?? "openai/gpt-4o",
+  openRouterNsfwChatModel: process.env.OPENROUTER_NSFW_CHAT_MODEL ?? "gryphe/mythomax-l2-13b",
+  openRouterNsfwRevisionModel: process.env.OPENROUTER_NSFW_REVISION_MODEL ?? process.env.OPENROUTER_NSFW_CHAT_MODEL ?? "gryphe/mythomax-l2-13b",
+  openRouterNsfwExtractModel: process.env.OPENROUTER_NSFW_EXTRACT_MODEL ?? process.env.OPENROUTER_EXTRACT_MODEL ?? "openai/gpt-4o",
   openRouterEmbeddingModel: process.env.OPENROUTER_EMBEDDING_MODEL ?? "openai/text-embedding-3-small",
   openRouterEmbeddingDimensions: Number(process.env.OPENROUTER_EMBEDDING_DIMENSIONS ?? 1536)
 };

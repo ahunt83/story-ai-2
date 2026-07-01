@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, BookOpen, FileText, Plus, Search, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, BookOpen, Eye, EyeOff, FileText, Plus, Search, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
@@ -14,6 +14,7 @@ type StoryRow = {
   title: string;
   initialPrompt: string;
   genreToneNotes: string | null;
+  isNsfw: boolean;
   status: string;
 };
 
@@ -23,6 +24,7 @@ export function LibraryClient() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [nsfwMode, setNsfwMode] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -52,10 +54,30 @@ export function LibraryClient() {
   function loadStories() {
     setLoading(true);
     setError(null);
-    apiFetch<{ stories: StoryRow[] }>("/api/stories")
-      .then((data) => setStories(data.stories))
+    apiFetch<{ stories: StoryRow[]; nsfwMode: boolean }>("/api/stories")
+      .then((data) => {
+        setStories(data.stories);
+        setNsfwMode(data.nsfwMode);
+      })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
+  }
+
+  async function toggleNsfwMode() {
+    const nextMode = !nsfwMode;
+    setError(null);
+    setNsfwMode(nextMode);
+
+    try {
+      await apiFetch("/api/user-preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ nsfwMode: nextMode })
+      });
+      loadStories();
+    } catch (err) {
+      setNsfwMode(!nextMode);
+      setError(err instanceof Error ? err.message : "Could not update content mode");
+    }
   }
 
   async function createStory(event: FormEvent<HTMLFormElement>) {
@@ -67,11 +89,12 @@ export function LibraryClient() {
     const title = String(form.get("title") ?? "");
     const initialPrompt = String(form.get("initialPrompt") ?? "");
     const genreToneNotes = String(form.get("genreToneNotes") ?? "");
+    const isNsfw = form.get("isNsfw") === "on";
 
     try {
-      const result = await apiFetch<{ storyId: string; chapterId: string; sceneId: string; foundationId: string }>("/api/stories", {
+      const result = await apiFetch<{ storyId: string; chapterId: string; sceneId: string; foundationId: string; isNsfw: boolean }>("/api/stories", {
         method: "POST",
-        body: JSON.stringify({ title, initialPrompt, genreToneNotes })
+        body: JSON.stringify({ title, initialPrompt, genreToneNotes, isNsfw })
       });
       window.location.href = `/foundation?storyId=${result.storyId}`;
     } catch (err) {
@@ -87,13 +110,14 @@ export function LibraryClient() {
     chapter: "Chapter 1",
     summary: story.initialPrompt,
     status: story.status,
+    isNsfw: story.isNsfw,
     progress: 5,
     words: 0,
     memoryItems: 0,
     live: true
   })), [stories]);
 
-  const cards = !loading && liveCards.length > 0 ? liveCards : sampleStories.map((story) => ({ ...story, live: false }));
+  const cards = !loading && liveCards.length > 0 ? liveCards : sampleStories.map((story) => ({ ...story, live: false, isNsfw: false }));
 
   return (
     <AppShell
@@ -111,7 +135,7 @@ export function LibraryClient() {
             <p className="ui-label mb-3 text-intelligence-teal">Active Stories</p>
             <h2 className="headline-serif text-3xl text-primary md:text-[40px]">Your manuscripts</h2>
             <p className="mt-2 max-w-2xl text-on-surface-variant">
-              {loading ? "Loading your local story library..." : liveCards.length > 0 ? "Live stories from Postgres are ready to write." : "No live stories yet. The cards below are design examples; create one to start the real flow."}
+              {loading ? "Loading your local story library..." : liveCards.length > 0 ? (nsfwMode ? "NSFW mode is on. Adult stories are visible in your library." : "Safe mode is on. NSFW stories are hidden by default.") : "No live stories yet. The cards below are design examples; create one to start the real flow."}
             </p>
             {error ? (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">
@@ -120,7 +144,13 @@ export function LibraryClient() {
               </div>
             ) : null}
           </div>
-          <Button variant="teal" onClick={() => setOpen(true)}><Plus size={18} />Start a New Manuscript</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={toggleNsfwMode}>
+              {nsfwMode ? <Eye size={18} /> : <EyeOff size={18} />}
+              {nsfwMode ? "NSFW Mode" : "Safe Mode"}
+            </Button>
+            <Button variant="teal" onClick={() => setOpen(true)}><Plus size={18} />Start a New Manuscript</Button>
+          </div>
         </section>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -130,7 +160,7 @@ export function LibraryClient() {
                 <div className="rounded-md bg-intelligence-glow p-3 text-intelligence-teal">
                   <BookOpen size={22} />
                 </div>
-                <span className="rounded-full bg-surface-container-low px-3 py-1 text-xs font-bold text-on-surface-variant">{story.live ? "Live" : story.status}</span>
+                <span className="rounded-full bg-surface-container-low px-3 py-1 text-xs font-bold text-on-surface-variant">{story.live && story.isNsfw ? "NSFW" : story.live ? "Live" : story.status}</span>
               </div>
               <h3 className="headline-serif text-2xl text-primary">{story.title}</h3>
               <p className="mt-2 min-h-12 line-clamp-3 text-sm leading-6 text-on-surface-variant">{story.summary}</p>
@@ -190,6 +220,15 @@ export function LibraryClient() {
             <label className="mb-6 block">
               <span className="ui-label mb-2 block text-on-surface-variant">Genre / Tone Notes</span>
               <input name="genreToneNotes" className="w-full rounded-md border border-outline-variant bg-white px-3 py-3 outline-none focus:border-intelligence-teal" placeholder="Literary gothic mystery, atmospheric, close third" />
+            </label>
+            <label className="mb-6 flex items-start gap-3 rounded-md border border-outline-variant bg-surface-container-low p-3">
+              <input name="isNsfw" type="checkbox" defaultChecked={nsfwMode} className="mt-1 h-4 w-4 accent-intelligence-teal" />
+              <span>
+                <span className="block text-sm font-bold text-on-surface">Mark as NSFW</span>
+                <span className="mt-1 block text-xs leading-5 text-on-surface-variant">
+                  NSFW stories are hidden in safe mode and use NSFW-friendly OpenRouter model defaults.
+                </span>
+              </span>
             </label>
             <Button variant="teal" className="w-full py-3" disabled={creating}>{creating ? "Creating..." : "Create Story"}</Button>
           </form>

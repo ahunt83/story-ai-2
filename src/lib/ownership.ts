@@ -2,6 +2,7 @@ import { and, eq, isNull, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { chapters, scenes, stories } from "@/db/schema";
+import { ensureUserPreferences } from "@/lib/user-preferences";
 
 export class NotFoundError extends Error {
   constructor(message = "Not found") {
@@ -19,6 +20,13 @@ export async function requireOwnedStory(storyId: string, userId: string) {
 
   if (!story) {
     throw new NotFoundError("Story not found");
+  }
+
+  if (story.isNsfw) {
+    const preferences = await ensureUserPreferences(userId);
+    if (!preferences.nsfwMode) {
+      throw new NotFoundError("Story not found");
+    }
   }
 
   if (!story.ownerUserId) {

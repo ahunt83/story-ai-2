@@ -16,6 +16,7 @@ Rules:
 - Infer sensible creative defaults when the prompt is incomplete, but list them in assumptionsAndGaps.inferredChoices.
 - Put directly stated user requirements in assumptionsAndGaps.explicitUserRequirements.
 - Put unresolved decisions in assumptionsAndGaps.missingInformation and assumptionsAndGaps.recommendedClarifyingQuestions.
+- Pay close attention to audienceAndBoundaries.sexualContentLevel. If the user wants explicit, on-page, erotic, open-door, or high sexual content, include the exact marker "NSFW" in sexualContentLevel. If sexual content should be absent, implied, closed-door, or fade-to-black, do not use the NSFW marker.
 - Return valid JSON matching the schema only.
 
 STORY TITLE:

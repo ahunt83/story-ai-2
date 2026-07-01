@@ -1,14 +1,15 @@
-import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "@/db";
-import { userPreferences } from "@/db/schema";
 import { fail, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
-import { defaultThemePreference, themePreferences } from "@/lib/theme";
+import { themePreferences } from "@/lib/theme";
+import { ensureUserPreferences, updateUserPreferences } from "@/lib/user-preferences";
 
 const updatePreferenceSchema = z.object({
-  themePreference: z.enum(themePreferences)
+  themePreference: z.enum(themePreferences).optional(),
+  nsfwMode: z.boolean().optional()
+}).refine((input) => input.themePreference !== undefined || input.nsfwMode !== undefined, {
+  message: "At least one preference must be provided."
 });
 
 export async function GET() {
@@ -25,40 +26,10 @@ export async function PATCH(request: Request) {
   try {
     const user = await requireUser();
     const input = updatePreferenceSchema.parse(await request.json());
-    const [preference] = await db
-      .insert(userPreferences)
-      .values({
-        userId: user.id,
-        themePreference: input.themePreference
-      })
-      .onConflictDoUpdate({
-        target: userPreferences.userId,
-        set: {
-          themePreference: input.themePreference,
-          updatedAt: sql`now()`
-        }
-      })
-      .returning();
+    const preference = await updateUserPreferences(user.id, input);
 
     return ok({ userPreferences: preference });
   } catch (error) {
     return fail(error);
   }
-}
-
-async function ensureUserPreferences(userId: string) {
-  const [existing] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
-  if (existing) {
-    return existing;
-  }
-
-  const [created] = await db
-    .insert(userPreferences)
-    .values({
-      userId,
-      themePreference: defaultThemePreference
-    })
-    .returning();
-
-  return created;
 }

@@ -15,4 +15,16 @@ describe("story model settings", () => {
       maxTokens: 1800
     });
   });
+
+  it("uses NSFW-friendly models for NSFW story defaults", () => {
+    expect(defaultStoryModelSettings({ nsfw: true })).toEqual({
+      chatModel: env.openRouterNsfwChatModel,
+      revisionModel: env.openRouterNsfwRevisionModel,
+      extractionModel: env.openRouterNsfwExtractModel,
+      embeddingModel: env.openRouterEmbeddingModel,
+      generationTemperature: 0.8,
+      revisionTemperature: 0.7,
+      maxTokens: 1800
+    });
+  });
 });

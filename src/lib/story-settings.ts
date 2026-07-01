@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { storyModelSettings } from "@/db/schema";
+import { stories, storyModelSettings } from "@/db/schema";
 import { env } from "@/lib/env";
 import { createId } from "@/lib/ids";
 
@@ -15,10 +15,10 @@ export type ResolvedStoryModelSettings = {
   maxTokens: number;
 };
 
-export const defaultStoryModelSettings = (): ResolvedStoryModelSettings => ({
-  chatModel: env.openRouterChatModel,
-  revisionModel: env.openRouterChatModel,
-  extractionModel: env.openRouterExtractModel,
+export const defaultStoryModelSettings = (options: { nsfw?: boolean } = {}): ResolvedStoryModelSettings => ({
+  chatModel: options.nsfw ? env.openRouterNsfwChatModel : env.openRouterChatModel,
+  revisionModel: options.nsfw ? env.openRouterNsfwRevisionModel : env.openRouterChatModel,
+  extractionModel: options.nsfw ? env.openRouterNsfwExtractModel : env.openRouterExtractModel,
   embeddingModel: env.openRouterEmbeddingModel,
   generationTemperature: 0.8,
   revisionTemperature: 0.7,
@@ -31,7 +31,8 @@ export async function ensureStoryModelSettings(storyId: string) {
     return existing;
   }
 
-  const defaults = defaultStoryModelSettings();
+  const [story] = await db.select({ isNsfw: stories.isNsfw }).from(stories).where(eq(stories.id, storyId)).limit(1);
+  const defaults = defaultStoryModelSettings({ nsfw: story?.isNsfw ?? false });
   const [created] = await db
     .insert(storyModelSettings)
     .values({

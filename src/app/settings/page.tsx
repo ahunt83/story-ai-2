@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { ContentModeSettings } from "@/components/content-mode-settings";
 import { StorySettingsClient } from "@/components/story-settings-client";
 import { ThemeSettings } from "@/components/theme-settings";
 import { MemoryCard } from "@/components/ui";
@@ -16,6 +17,9 @@ export default async function SettingsPage() {
   const rows = [
     ["Chat model", env.openRouterChatModel],
     ["Extraction model", env.openRouterExtractModel],
+    ["NSFW chat model", env.openRouterNsfwChatModel],
+    ["NSFW revision model", env.openRouterNsfwRevisionModel],
+    ["NSFW extraction model", env.openRouterNsfwExtractModel],
     ["Embedding model", env.openRouterEmbeddingModel],
     ["Embedding dimensions", String(env.openRouterEmbeddingDimensions)],
     ["API key", env.openRouterApiKey ? "Configured" : "Missing"]
@@ -31,6 +35,11 @@ export default async function SettingsPage() {
             <MemoryCard title="Appearance">
               <p className="mb-4">Choose how Codex looks for your user profile. The preference is saved to your account and applied across the app.</p>
               <ThemeSettings />
+            </MemoryCard>
+          </div>
+          <div className="mb-5">
+            <MemoryCard title="Content Mode">
+              <ContentModeSettings />
             </MemoryCard>
           </div>
           <MemoryCard title="OpenRouter">
